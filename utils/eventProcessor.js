@@ -9,10 +9,7 @@ const client = new LambdaClient({
   region: "eu-west-3",
 });
 
-const lambdaArn =
-  "arn:aws:lambda:eu-west-3:168763042228:function:cypress-lambda";
-
-async function sendEventsToLambda(files, runId) {
+async function sendEventsToLambda(files, runId, lambdaArn) {
   return new Promise(async (resolve) => {
     try {
       let command;
