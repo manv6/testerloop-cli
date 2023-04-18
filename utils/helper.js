@@ -1,4 +1,6 @@
 const { v4 } = require("uuid");
+const { readFileSync, readFile } = require("fs");
+
 let runId, orgURL, exitCode;
 
 function wait(ms = 5000) {
@@ -101,13 +103,49 @@ async function createFailedLinks(failedTests, orgURL) {
   );
 }
 
+function checkIfContainsTag(filename, str) {
+  const contents = readFileSync(filename, "utf-8");
+  const re = RegExp(`(^|\\s)${str}(\\s|$)`);
+  return contents.match(re);
+}
+
+function checkIfAllWipped(filename, tag) {
+  // Check if every scenario is wipped
+  const contents = readFileSync(filename, "utf-8");
+  let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
+  numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
+  const tagRegex = new RegExp(`${tag}`, "g");
+  const numOfTagged = (contents.match(tagRegex) || []).length;
+  return numOfTagged < numOfScenarios;
+}
+
+async function readConfigurationFIle(file) {
+  return new Promise(function (resolve, reject) {
+    readFile(file, "utf-8", (err, data) => {
+      if (err) {
+        console.error(`Error reading ${file} file 1: ${err}`);
+        return;
+      }
+      resolve(JSON.parse(data));
+    });
+  });
+}
+
+function cleanInput(str) {
+  return str.split(",").map((str) => str.trim());
+}
+
 module.exports = {
   setRunId,
   getRunId,
   getOrgUrl,
   setOrgUrl,
+  cleanInput,
   getExitCode,
   setExitCode,
+  checkIfContainsTag,
+  checkIfAllWipped,
+  readConfigurationFIle,
   wait,
   line,
   clearValues,

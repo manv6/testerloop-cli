@@ -21,6 +21,7 @@
   },
   "homepage": "https://github.com/testerloop/testerloop-cli#readme",
   "dependencies": {
+    "@aws-sdk/client-ecs": "^3.312.0",
     "@aws-sdk/client-lambda": "^3.309.0",
     "@aws-sdk/client-s3": "^3.306.0",
     "arg": "^5.0.2",
