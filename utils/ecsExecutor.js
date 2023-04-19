@@ -70,11 +70,18 @@ async function executeEcs() {
 
   if (tasks.length > 0) {
     // Wait for tasks to complete
-    const waitECSTask = await waitUntilTasksStopped(
-      { client: ecsClient, maxWaitTime: 3000, maxDelay: 20, minDelay: 10 },
-      { cluster: clusterARN, tasks }
-    );
-    console.log("wait for tasks to finish", waitECSTask);
+    console.log("Starting to poll for tasks to complete");
+    let waitECSTask;
+    try {
+      waitECSTask = await waitUntilTasksStopped(
+        { client: ecsClient, maxWaitTime: 1000, maxDelay: 10, minDelay: 5 },
+        { cluster: clusterARN, tasks }
+      );
+    } catch (err) {
+      console.log("Error waiting for the ecs tasks", err);
+    }
+
+    console.log("Wait for tasks to finish", waitECSTask);
     console.log(`\tNumber of tasks ran: ${tasks.length}`);
     // Check if task timed out
     let timedOutContainers = [];
