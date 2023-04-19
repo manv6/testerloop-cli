@@ -1,11 +1,16 @@
 const glob = require("glob");
-const { handleResult, getInputData } = require("./handlers");
+const {
+  handleResult,
+  getInputData,
+  getEnvVariableValuesFromCi,
+} = require("./handlers");
 const { sendCommandToEcs, ecsClient } = require("./taskProcessor");
-const { checkIfAllWipped, checkIfContainsTag } = require("./helper");
+const { checkIfAllWipped, checkIfContainsTag, getRunId } = require("./helper");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 
 async function executeEcs() {
   const {
+    envVariables,
     specFiles,
     tag,
     containerName,
@@ -33,6 +38,14 @@ async function executeEcs() {
         tag !== undefined ? checkIfContainsTag(file, tag) : false;
       const unwippedScenarios = checkIfAllWipped(file, tag);
 
+      const envVariablesWithValueToPassOnCommand =
+        getEnvVariableValuesFromCi(envVariables);
+      console.log("Variables to be pushed to ECS:", envVariables);
+      envVariablesWithValueToPassOnCommand.push({
+        name: "RUN_ID",
+        value: getRunId(),
+      });
+
       const cypressCommand =
         `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
           " "
@@ -48,7 +61,8 @@ async function executeEcs() {
             taskDefinition,
             subnets,
             securityGroups,
-            uploadToS3RoleArn
+            uploadToS3RoleArn,
+            envVariablesWithValueToPassOnCommand
           )
         );
       }

@@ -17,12 +17,12 @@ async function sendCommandToEcs(
   taskDefinition,
   subnets,
   securityGroups,
-  uploadToS3RoleArn
+  uploadToS3RoleArn,
+  envVariableList
 ) {
   return new Promise(async (resolve) => {
     console.log(`final command: ${runCommand}`);
     const overrides = [{ name: containerName, command: runCommand }];
-    let envVariableList = [{ name: "RUN_ID", value: getRunId() }];
     overrides[0].environment = envVariableList;
 
     const runTaskCommand = new RunTaskCommand({

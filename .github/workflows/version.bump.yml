@@ -1,0 +1,22 @@
+name: Version bump
+on:
+  push:
+    branches:
+      - master
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Version bump
+      uses: stefanzweifel/git-auto-commit-action@v4
+      with:
+        commit_message: "Bump version"
+        commit_options: "--no-verify"
+        file_pattern: "package.json"
+        pull_branch: "master"
+        push_branch: "master"
+        signing_key: "${{ secrets.GPG_PRIVATE_KEY }}"
+      env:
+        GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}

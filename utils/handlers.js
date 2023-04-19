@@ -76,12 +76,12 @@ async function getInputData() {
       timeOutInSecs || configurationData.lambda?.timeOutInSecs || 120,
     executionTypeInput: executionTypeInput,
     containerName: configurationData.ecs?.containerName,
-    clusterARN: configurationData.ecs?.clusterARN || "cypress-ecs-cluster",
-    taskDefinition:
-      taskDefinition || configurationData.ecs?.taskDefinition || "testerloop:3",
+    clusterARN: configurationData.ecs?.clusterARN,
+    taskDefinition: taskDefinition || configurationData.ecs?.taskDefinition,
     subnets: configurationData.ecs?.subnets,
     securityGroups: configurationData.ecs?.securityGroups,
     uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
+    envVariables: configurationData.envVariables || [],
   };
 }
 
@@ -150,10 +150,22 @@ async function createFinalCommand(addRunId = true) {
   return finalCommand;
 }
 
+function getEnvVariableValuesFromCi(listOfVariables) {
+  const listOfVariablesWithValues = [];
+  for (const variable of listOfVariables) {
+    listOfVariablesWithValues.push({
+      name: variable,
+      value: process.env[variable],
+    });
+  }
+  return listOfVariablesWithValues;
+}
+
 module.exports = {
   handleResult,
   getInputData,
   getExecutionType,
   createFinalCommand,
   handleExecutionTypeInput,
+  getEnvVariableValuesFromCi,
 };
