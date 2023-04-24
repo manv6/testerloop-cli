@@ -19,6 +19,9 @@ async function executeEcs() {
     subnets,
     securityGroups,
     uploadToS3RoleArn,
+    s3BucketName,
+    customPath,
+    uploadFilesToS3,
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
@@ -30,6 +33,8 @@ async function executeEcs() {
   const taskDetails = [];
   const fileNames = [];
   const pendingEcsTasks = [];
+  console.log("Variables to be pushed to ECS:", envVariables);
+
   await Promise.all(
     files.map(async (file) => {
       const filename = file.split("/").pop();
@@ -40,14 +45,23 @@ async function executeEcs() {
 
       const envVariablesWithValueToPassOnCommand =
         getEnvVariableValuesFromCi(envVariables);
-      console.log("Variables to be pushed to ECS:", envVariables);
-      envVariablesWithValueToPassOnCommand.push({
-        name: "RUN_ID",
-        value: getRunId(),
-      });
 
-      const cypressCommand =
-        `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
+      const reporterVariables = {
+        TL_RUN_ID: getRunId(),
+        TL_TEST_ID: undefined,
+        TL_S3_BUCKET_NAME: s3BucketName,
+        TL_EXECUTE_FROM: "local",
+        TL_CUSTOM_RESULTS_PATH: customPath,
+        TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+      };
+
+      const reporterVariablesAsString = Object.entries(reporterVariables)
+        .filter(([_, value]) => value !== undefined)
+        .map(([key, value]) => `${key}=${value}`)
+        .join(",");
+
+      let cypressCommand =
+        `timeout 2400 npx cypress run --browser chrome --spec ${file} --env ${reporterVariablesAsString}`.split(
           " "
         );
       const finalCommand = cypressCommand;
@@ -95,7 +109,6 @@ async function executeEcs() {
       console.log("Error waiting for the ecs tasks", err);
     }
 
-    console.log("Wait for tasks to finish", waitECSTask);
     console.log(`\tNumber of tasks ran: ${tasks.length}`);
     // Check if task timed out
     let timedOutContainers = [];
@@ -121,7 +134,7 @@ async function executeEcs() {
     }
   }
   if (tasks.length > 0) {
-    await handleResult();
+    await handleResult(s3BucketName, customPath);
   }
 }
 

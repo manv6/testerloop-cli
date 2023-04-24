@@ -41,7 +41,7 @@ function setRunId() {
 }
 
 function setOrgUrl(orgUrl) {
-  orgURL = orgUrl;
+  orgURL = orgUrl.endsWith("/") ? orgUrl.slice(0, -1) : orgUrl;
 }
 
 function line() {
@@ -88,19 +88,15 @@ async function getFailedTests(directory, prefix) {
 async function createFailedLinks(failedTests, orgURL) {
   const colors = require("colors");
   colors.enable();
-  console.log(
-    "-----------------------------------------------------------------------------------------------------"
-  );
+  line();
   for (const failed of failedTests) {
     console.log(
       colors.red(`Test failed: `) +
         `${failed.title} ` +
-        colors.magenta(`${orgURL}runs/${getRunId()}/testId/${failed.testId}`)
+        colors.magenta(`${orgURL}/run/${getRunId()}/test/${failed.testId}`)
     );
   }
-  console.log(
-    "-------------------------------------------------------------------------------------------"
-  );
+  line();
 }
 
 function checkIfContainsTag(filename, str) {

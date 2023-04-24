@@ -5,6 +5,7 @@ colors.enable();
 const {
   getInputData,
   getExecutionType,
+  setS3RunPath,
   handleExecutionTypeInput,
 } = require("./utils/handlers");
 
@@ -15,17 +16,17 @@ const { line, setRunId, getRunId, setOrgUrl } = require("./utils/helper");
 
 async function main() {
   // Determine execution type
-  const { executionTypeInput } = await getInputData();
+  const { executionTypeInput, reporterBaseUrl, s3BucketName, customPath } =
+    await getInputData();
   handleExecutionTypeInput(executionTypeInput);
 
-  // Set and log the runId
+  // Set and org base url for the links & the runId
+  setOrgUrl(reporterBaseUrl);
   setRunId();
+  setS3RunPath(s3BucketName, customPath, getRunId());
   line();
   console.log("Your run id is: ", colors.magenta(getRunId()));
   line();
-
-  // Set the orgUrl. @TODO grab it from an HTTP request
-  setOrgUrl("https://otf.overloop.io/");
 
   // Execute
   switch (getExecutionType()) {

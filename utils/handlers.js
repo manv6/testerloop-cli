@@ -1,7 +1,5 @@
 const {
-  getRunId,
   getOrgUrl,
-  cleanInput,
   setExitCode,
   getExitCode,
   getFailedTests,
@@ -10,21 +8,34 @@ const {
 } = require("./helper");
 const { syncFilesFromS3 } = require("./s3");
 const arg = require("arg");
+let s3RunPath;
+
+function getS3RunPath() {
+  return s3RunPath;
+}
+function setS3RunPath(s3BucketName, customPath, runId) {
+  s3RunPath = (s3BucketName + "/" + customPath + "/" + runId)
+    .replaceAll("//", "/")
+    .replaceAll("//", "/");
+}
 
 const args = arg({}, { permissive: true });
 let executionType;
 
-async function handleResult() {
+async function handleResult(bucket, customPath) {
   // If the exit code is already known, ignore (timeout case)
   if (!getExitCode()) {
     // Grab the failed files from the s3 and store them locally
     await syncFilesFromS3(
-      `s3://otf-lambda-results/custom/results/${getRunId()}/results`,
+      `s3://${getS3RunPath()}/results`,
       `logs/failedTestResults`
     );
 
     // Iterate through the failed test files and determine the failed ids to create the links
-    const directory = `./logs/failedTestResults/custom/results/${getRunId()}/results`;
+    const directory = `./logs/failedTestResults/${getS3RunPath().replace(
+      bucket + "/",
+      ""
+    )}/results`;
     const failedTestResults = await getFailedTests(directory, "failed-");
     await createFailedLinks(failedTestResults, getOrgUrl());
     failedTestResults.length > 0 ? setExitCode(1) : setExitCode(0);
@@ -42,16 +53,14 @@ async function getInputData() {
   let specFiles,
     timeOutInSecs = 120,
     executionTypeInput,
-    //ecs args
-    tag,
-    taskDefinition;
+    tag;
 
   for (let i = 0; i < cliArgs.length; i++) {
     switch (cliArgs[i]) {
       case "--spec":
         specFiles = cliArgs[i + 1];
         break;
-      case "--pollTimeoutInSeconds":
+      case "--lambdaTimeoutInSeconds":
         timeOutInSecs = cliArgs[i + 1];
         break;
       case "--execute-on":
@@ -59,9 +68,6 @@ async function getInputData() {
         break;
       case "--tag":
         tag = cliArgs[i + 1];
-        break;
-      case "--task-definition":
-        taskDefinition = cliArgs[i + 1];
         break;
       default:
         break;
@@ -77,11 +83,17 @@ async function getInputData() {
     executionTypeInput: executionTypeInput,
     containerName: configurationData.ecs?.containerName,
     clusterARN: configurationData.ecs?.clusterARN,
-    taskDefinition: taskDefinition || configurationData.ecs?.taskDefinition,
+    taskDefinition: configurationData.ecs?.taskDefinition,
     subnets: configurationData.ecs?.subnets,
     securityGroups: configurationData.ecs?.securityGroups,
     uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
     envVariables: configurationData.envVariables || [],
+    uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
+    s3BucketName:
+      configurationData.reporter?.s3BucketName ||
+      "testerloop-default-bucket-name",
+    customPath: configurationData.reporter?.customPath || "",
+    reporterBaseUrl: configurationData?.reporterBaseUrl,
   };
 }
 
@@ -131,22 +143,11 @@ async function clearTheArgs(argsToRemoveArray) {
   });
 }
 
-async function createFinalCommand(addRunId = true) {
-  let argsToRemove = [
-    "--keyId",
-    "--execute-on",
-    "--container-name",
-    "--task-definition",
-    "--cluster-arn",
-    "--subnets",
-    "--security-groups",
-  ];
-
-  let envVariablesToPassOnCommand = addRunId ? [`RUN_ID=${getRunId()} `] : [];
+async function createFinalCommand() {
+  let argsToRemove = ["--execute-on"];
 
   let clearedArgs = await clearTheArgs(argsToRemove);
-  const finalCommand =
-    envVariablesToPassOnCommand.join(" ") + " npx " + clearedArgs.join(" ");
+  const finalCommand = "npx " + clearedArgs.join(" ");
   return finalCommand;
 }
 
@@ -164,6 +165,8 @@ function getEnvVariableValuesFromCi(listOfVariables) {
 module.exports = {
   handleResult,
   getInputData,
+  getS3RunPath,
+  setS3RunPath,
   getExecutionType,
   createFinalCommand,
   handleExecutionTypeInput,

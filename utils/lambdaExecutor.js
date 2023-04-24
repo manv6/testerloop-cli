@@ -4,16 +4,24 @@ const {
   getRunId,
   setExitCode,
   clearFeaturePath,
-  arraysHaveSameElements,
 } = require("./helper");
 const glob = require("glob");
-const { listS3Folders } = require("./s3");
+const { checkFileExistsInS3 } = require("./s3");
 const { sendEventsToLambda } = require("./eventProcessor");
-const { handleResult, getInputData } = require("./handlers");
+const { handleResult, getInputData, getS3RunPath } = require("./handlers");
 const { cucumberSlicer } = require("cucumber-cypress-slicer");
+const colors = require("colors");
+colors.enable();
 
 async function executeLambdas() {
-  const { specFiles, lambdaArn, timeOutInSecs } = await getInputData();
+  const {
+    specFiles,
+    lambdaArn,
+    timeOutInSecs,
+    uploadFilesToS3,
+    s3BucketName,
+    customPath,
+  } = await getInputData();
 
   // Slice the cucumber files
   let filesToExecute = specFiles.includes(".feature")
@@ -25,46 +33,70 @@ async function executeLambdas() {
     .map((file) => `${file}`);
   console.log("LOG: Found files to execute: ", files);
 
+  // Create the reporter variables to pass on to the reporter
+  // Leave request id undefined so it can get the one from the lamdba process.env
+  const reporterVariables = {
+    TL_RUN_ID: getRunId(),
+    TL_TEST_ID: undefined,
+    TL_S3_BUCKET_NAME: s3BucketName,
+    TL_EXECUTE_FROM: "lambda",
+    TL_CUSTOM_RESULTS_PATH: customPath,
+    TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+  };
+
   // Send the events to the lambda
-  const results = await sendEventsToLambda(files, getRunId(), lambdaArn);
+  const results = await sendEventsToLambda(files, lambdaArn, reporterVariables);
 
   // Push the results into an array to handle later for polling
   let requestIdsToCheck = [];
+  let listToCheck = [];
   line();
   results.forEach((result, index) => {
     console.log(
-      "Request id:    ",
+      colors.cyan("Test id: "),
       result.$metadata.requestId,
       `   ${clearFeaturePath(files[index])}`
     );
-
-    requestIdsToCheck.push({
-      requestId: JSON.stringify(result.$metadata.requestId).replaceAll('"', ""),
+    let test = {
+      tlTestId: JSON.stringify(result.$metadata.requestId).replaceAll('"', ""),
       fileName: files[index],
       result: "running",
       startDate: Date.now(),
-    });
+    };
+    requestIdsToCheck.push(test);
   });
   line();
 
   // Poll for results in s3
-  let finished = false;
   let counter = 0;
   let timedOut = false;
-
-  while (finished !== true && timedOut !== true) {
+  listToCheck = [...requestIdsToCheck];
+  console.log("Polling for test results in s3...");
+  line();
+  while (listToCheck.length > 0 && timedOut !== true) {
     try {
-      // Poll s3 for results in s3/bucket/customPath/runId/
-      let customPath = `custom/results/${getRunId()}/`;
-      let results = await listS3Folders("otf-lambda-results", customPath);
-      console.log("Polling results = ", results);
-      // Check if the results include all the request IDss
-      if (await arraysHaveSameElements(requestIdsToCheck, results)) {
-        console.log(
-          "All of the lambda ids are included in the s3 results folder"
+      const remainingIds = requestIdsToCheck.filter((obj1) =>
+        listToCheck.some((obj2) => obj2.tlTestId === obj1.tlTestId)
+      );
+      for (let test of remainingIds) {
+        let filePath = `${getS3RunPath()}/${test.tlTestId}/test.complete`;
+        let fileExists = await checkFileExistsInS3(
+          s3BucketName,
+          filePath.replace(s3BucketName + "/", "")
         );
-        finished = true;
+        if (fileExists) {
+          console.log("Found test.complete file for " + filePath);
+          // // find the index of the object you want to remove
+          let index = listToCheck.findIndex(
+            (obj) => obj.tlTestId === test.tlTestId
+          );
+          // // remove the object from the array using splice()
+          if (index !== -1) {
+            listToCheck.splice(index, 1);
+          }
+        }
       }
+      line();
     } catch (e) {
       console.log(e);
     }
@@ -78,7 +110,7 @@ async function executeLambdas() {
     }
     await wait(5000);
   }
-  await handleResult();
+  await handleResult(s3BucketName, customPath);
 }
 
 module.exports = {

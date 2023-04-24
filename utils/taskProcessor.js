@@ -21,7 +21,6 @@ async function sendCommandToEcs(
   envVariableList
 ) {
   return new Promise(async (resolve) => {
-    console.log(`final command: ${runCommand}`);
     const overrides = [{ name: containerName, command: runCommand }];
     overrides[0].environment = envVariableList;
 
