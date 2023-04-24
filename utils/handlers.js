@@ -2,11 +2,12 @@ const {
   getOrgUrl,
   setExitCode,
   getExitCode,
+  clearValues,
   getFailedTests,
   createFailedLinks,
   readConfigurationFIle,
 } = require("./helper");
-const { syncFilesFromS3 } = require("./s3");
+const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
 const arg = require("arg");
 let s3RunPath;
 
@@ -151,6 +152,19 @@ async function createFinalCommand() {
   return finalCommand;
 }
 
+async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
+  uploadFileToS3(
+    s3BucketName,
+    `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd/cicd.json`,
+    JSON.stringify(
+      clearValues({ ...process.env }, [
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+      ])
+    )
+  );
+}
+
 function getEnvVariableValuesFromCi(listOfVariables) {
   const listOfVariablesWithValues = [];
   for (const variable of listOfVariables) {
@@ -171,4 +185,5 @@ module.exports = {
   createFinalCommand,
   handleExecutionTypeInput,
   getEnvVariableValuesFromCi,
+  createAndUploadCICDFileToS3Bucket,
 };

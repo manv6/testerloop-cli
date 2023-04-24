@@ -7,6 +7,7 @@ const {
   getExecutionType,
   setS3RunPath,
   handleExecutionTypeInput,
+  createAndUploadCICDFileToS3Bucket,
 } = require("./utils/handlers");
 
 const { executeEcs } = require("./utils/ecsExecutor");
@@ -24,6 +25,7 @@ async function main() {
   setOrgUrl(reporterBaseUrl);
   setRunId();
   setS3RunPath(s3BucketName, customPath, getRunId());
+  createAndUploadCICDFileToS3Bucket(s3BucketName);
   line();
   console.log("Your run id is: ", colors.magenta(getRunId()));
   line();
