@@ -10,6 +10,7 @@ const {
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
 const arg = require("arg");
 let s3RunPath;
+const LCL = require("last-commit-log");
 
 function getS3RunPath() {
   return s3RunPath;
@@ -153,15 +154,17 @@ async function createFinalCommand() {
 }
 
 async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
+  const lcl = new LCL();
+  const commit = lcl.getLastCommitSync();
+
+  let env = clearValues({ ...process.env }, [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+  ]);
   uploadFileToS3(
     s3BucketName,
     `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
-    JSON.stringify(
-      clearValues({ ...process.env }, [
-        "AWS_ACCESS_KEY_ID",
-        "AWS_SECRET_ACCESS_KEY",
-      ])
-    )
+    JSON.stringify({ ...commit, ...env })
   );
 }
 
