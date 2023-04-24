@@ -155,7 +155,7 @@ async function createFinalCommand() {
 async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
   uploadFileToS3(
     s3BucketName,
-    `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd/cicd.json`,
+    `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
     JSON.stringify(
       clearValues({ ...process.env }, [
         "AWS_ACCESS_KEY_ID",
