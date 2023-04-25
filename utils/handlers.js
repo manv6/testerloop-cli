@@ -161,6 +161,21 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
   ]);
+
+  let additionalEnvsForLocalExecution = {
+    GITHUB_SERVER_URL: "local",
+    GITHUB_REF_NAME: "local",
+    GITHUB_REPOSITORY: "local",
+    GITHUB_REPOSITORY_OWNER: "local",
+  };
+
+  env = Object.keys(additionalEnvsForLocalExecution).reduce((acc, key) => {
+    if (!env.hasOwnProperty(key)) {
+      acc[key] = additionalEnvsForLocalExecution[key];
+    }
+    return acc;
+  }, env); // Check if each variable in additionalEnvsForLocalExecution is already in env
+
   uploadFileToS3(
     s3BucketName,
     `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
