@@ -8,7 +8,12 @@ const {
 const glob = require("glob");
 const { checkFileExistsInS3 } = require("./s3");
 const { sendEventsToLambda } = require("./eventProcessor");
-const { handleResult, getInputData, getS3RunPath } = require("./handlers");
+const {
+  handleResult,
+  getInputData,
+  getS3RunPath,
+  getEnvVariableValuesFromCi,
+} = require("./handlers");
 const { cucumberSlicer } = require("cucumber-cypress-slicer");
 const colors = require("colors");
 colors.enable();
@@ -21,6 +26,7 @@ async function executeLambdas() {
     uploadFilesToS3,
     s3BucketName,
     customPath,
+    envVariablesLambda,
   } = await getInputData();
 
   // Slice the cucumber files
@@ -36,16 +42,25 @@ async function executeLambdas() {
   // Create the reporter variables to pass on to the reporter
   // Leave request id undefined so it can get the one from the lamdba process.env
   const reporterVariables = {
-    TL_RUN_ID: getRunId(),
-    TL_TEST_ID: undefined,
-    TL_S3_BUCKET_NAME: s3BucketName,
-    TL_EXECUTE_FROM: "lambda",
-    TL_CUSTOM_RESULTS_PATH: customPath,
-    TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+    CYPRESS_TL_RUN_ID: getRunId(),
+    CYPRESS_TL_TEST_ID: undefined,
+    CYPRESS_TL_S3_BUCKET_NAME: s3BucketName,
+    CYPRESS_TL_EXECUTE_FROM: "lambda",
+    CYPRESS_TL_CUSTOM_RESULTS_PATH: customPath,
+    CYPRESS_TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
   };
 
+  const envVars = { ...reporterVariables };
+  let userEnvVarsWithValues = getEnvVariableValuesFromCi(envVariablesLambda);
+
+  userEnvVarsWithValues.forEach((item) => {
+    envVars[item.name] = item.value;
+  });
+
+  console.log("userEnvVarsWithValues: ", envVars);
+
   // Send the events to the lambda
-  const results = await sendEventsToLambda(files, lambdaArn, reporterVariables);
+  const results = await sendEventsToLambda(files, lambdaArn, envVars);
 
   // Push the results into an array to handle later for polling
   let requestIdsToCheck = [];

@@ -3,7 +3,6 @@ const {
   RunTaskCommand,
   waitUntilTasksStopped,
 } = require("@aws-sdk/client-ecs");
-const { getRunId } = require("../utils/helper");
 
 const ecsClient = new ECSClient("eu-west-3");
 

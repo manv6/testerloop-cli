@@ -5,12 +5,17 @@ const {
   getEnvVariableValuesFromCi,
 } = require("./handlers");
 const { sendCommandToEcs, ecsClient } = require("./taskProcessor");
-const { checkIfAllWipped, checkIfContainsTag, getRunId } = require("./helper");
+const {
+  checkIfAllWiped,
+  checkIfContainsTag,
+  getRunId,
+  categorizeTags,
+} = require("./helper");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 
 async function executeEcs() {
   const {
-    envVariables,
+    envVariablesECS,
     specFiles,
     tag,
     containerName,
@@ -22,6 +27,7 @@ async function executeEcs() {
     s3BucketName,
     customPath,
     uploadFilesToS3,
+    customCommand,
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
@@ -33,18 +39,28 @@ async function executeEcs() {
   const taskDetails = [];
   const fileNames = [];
   const pendingEcsTasks = [];
-  console.log("Variables to be pushed to ECS:", envVariables);
 
   await Promise.all(
     files.map(async (file) => {
       const filename = file.split("/").pop();
-      fileNames.push(filename);
-      const fileHasTag =
-        tag !== undefined ? checkIfContainsTag(file, tag) : false;
-      const unwippedScenarios = checkIfAllWipped(file, tag);
+      // Determine if the file is suitable for execution based on tags
+      const tagsIncludedExcluded = categorizeTags(tag);
+      let fileHasTag;
+      tagsIncludedExcluded.includedTags.forEach((tag) => {
+        if (!fileHasTag) {
+          fileHasTag =
+            tag !== undefined ? checkIfContainsTag(file, tag) : false;
+        }
+      });
 
-      const envVariablesWithValueToPassOnCommand =
-        getEnvVariableValuesFromCi(envVariables);
+      let result = [];
+      tagsIncludedExcluded.excludedTags.forEach((tag) => {
+        result.push(checkIfAllWiped(file, tag));
+      });
+      let unWipedScenarios = result.includes(false) ? false : true;
+
+      let envVariablesWithValueToPassOnCommand =
+        getEnvVariableValuesFromCi(envVariablesECS);
 
       const reporterVariables = {
         TL_RUN_ID: getRunId(),
@@ -55,18 +71,36 @@ async function executeEcs() {
         TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
       };
 
-      const reporterVariablesAsString = Object.entries(reporterVariables)
+      // Add to the variables to be set on the container the reporter ones with CYPRESS_ prefix
+      const reporterVariablesAsCypressVariables = Object.entries(
+        reporterVariables
+      )
         .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => `${key}=${value}`)
-        .join(",");
-
-      let cypressCommand =
-        `timeout 2400 npx cypress run --browser chrome --spec ${file} --env ${reporterVariablesAsString}`.split(
-          " "
+        .map(([key, value]) => ({
+          name: "CYPRESS_" + key,
+          value: value.toString(),
+        }));
+      envVariablesWithValueToPassOnCommand =
+        envVariablesWithValueToPassOnCommand.concat(
+          reporterVariablesAsCypressVariables
         );
-      const finalCommand = cypressCommand;
-      if (unwippedScenarios && (fileHasTag || tag === undefined)) {
+
+      // Determine if there is a custom command
+      let finalCommand;
+      if (customCommand) {
+        finalCommand = `timeout 2400 ${customCommand
+          .replace(/%TEST_FILE\b/g, file)
+          .replace(/%TEST_FILENAME\b/g, file.split("/").pop())}`.split(" ");
+      } else {
+        finalCommand =
+          `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
+            " "
+          );
+      }
+      if (unWipedScenarios && (fileHasTag || tag === undefined)) {
         // Send the events to ecs
+        fileNames.push(filename);
+
         pendingEcsTasks.push(
           sendCommandToEcs(
             containerName,
@@ -81,9 +115,13 @@ async function executeEcs() {
         );
       }
       if (fileHasTag === null && tag !== undefined)
-        console.log(`${filename}\nno ${tag} tag in file ${file}`);
-      if (!unwippedScenarios)
-        console.log(`All scenarios tagged as '${tag}' for ${filename}`);
+        console.log(
+          `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`
+        );
+      if (!unWipedScenarios)
+        console.log(
+          `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`
+        );
     })
   );
   console.log("Executing ", pendingEcsTasks.length, " tasks:");
@@ -102,7 +140,7 @@ async function executeEcs() {
     let waitECSTask;
     try {
       waitECSTask = await waitUntilTasksStopped(
-        { client: ecsClient, maxWaitTime: 1000, maxDelay: 10, minDelay: 5 },
+        { client: ecsClient, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
         { cluster: clusterARN, tasks }
       );
     } catch (err) {

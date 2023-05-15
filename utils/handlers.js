@@ -52,10 +52,7 @@ async function getInputData() {
   let configurationData = await readConfigurationFIle(".testerlooprc.json");
 
   // Override JSON data with CLI arguments
-  let specFiles,
-    timeOutInSecs = 120,
-    executionTypeInput,
-    tag;
+  let specFiles, timeOutInSecs, executionTypeInput, tag, customCommand, help;
 
   for (let i = 0; i < cliArgs.length; i++) {
     switch (cliArgs[i]) {
@@ -70,6 +67,13 @@ async function getInputData() {
         break;
       case "--tag":
         tag = cliArgs[i + 1];
+        break;
+      case "--custom-command":
+        customCommand = cliArgs[i + 1];
+        break;
+      case "--help":
+      case "-h":
+        help = true;
         break;
       default:
         break;
@@ -89,13 +93,16 @@ async function getInputData() {
     subnets: configurationData.ecs?.subnets,
     securityGroups: configurationData.ecs?.securityGroups,
     uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
-    envVariables: configurationData.envVariables || [],
+    envVariablesECS: configurationData.ecs?.envVariables || [],
+    envVariablesLambda: configurationData.lambda?.envVariables || [],
     uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
     s3BucketName:
       configurationData.reporter?.s3BucketName ||
       "testerloop-default-bucket-name",
     customPath: configurationData.reporter?.customPath || "",
     reporterBaseUrl: configurationData?.reporterBaseUrl,
+    customCommand: customCommand || "",
+    help: help,
   };
 }
 
@@ -127,8 +134,9 @@ function getExecutionType() {
 const parseArguments = async () => {
   //force the arguments to be cypress run if they are not specified
   const cliArgs = args._;
-  if (cliArgs[0] !== "cypress") cliArgs.unshift("cypress");
-  if (cliArgs[1] !== "run") cliArgs.splice(1, 0, "run");
+  // console.log("CLI Arguments:", cliArgs);
+  // if (cliArgs[0] !== "cypress") cliArgs.unshift("cypress");
+  // if (cliArgs[1] !== "run") cliArgs.splice(1, 0, "run");
   return cliArgs;
 };
 

@@ -18,14 +18,22 @@ async function executeLocal() {
     TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
   };
 
-  const reporterVariablesAsString = Object.entries(reporterVariables)
-    .filter(([_, value]) => value !== undefined)
-    .map(([key, value]) => `${key}=${value}`)
-    .join(",");
+  let reporterVariablesString = "";
+
+  for (const key in reporterVariables) {
+    if (
+      reporterVariables.hasOwnProperty(key) &&
+      reporterVariables[key] !== undefined
+    ) {
+      reporterVariablesString += `CYPRESS_${key}=${reporterVariables[key]} `;
+    }
+  }
+  reporterVariablesString = reporterVariablesString.trim();
 
   let command = await createFinalCommand(false);
   console.log("Executing command: ", command);
-  command += " --env  " + reporterVariablesAsString;
+  command = reporterVariablesString + " " + command;
+
   const child = spawn(command, { shell: true, stdio: "inherit" });
   if (child.stdout) {
     child.stdout.pipe(process.stdout);

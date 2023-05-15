@@ -9,7 +9,7 @@ const client = new LambdaClient({
   region: "eu-west-3",
 });
 
-async function sendEventsToLambda(files, lambdaArn, envVariablesWithValues) {
+async function sendEventsToLambda(files, lambdaArn, envVars) {
   return new Promise(async (resolve) => {
     try {
       let command;
@@ -20,7 +20,7 @@ async function sendEventsToLambda(files, lambdaArn, envVariablesWithValues) {
             InvocationType: InvocationType.Event,
             Payload: JSON.stringify({
               spec: file.split("/").pop(),
-              env: envVariablesWithValues,
+              envVars,
             }),
             LogType: LogType.Tail,
           });
