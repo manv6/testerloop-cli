@@ -1,4 +1,4 @@
-name: Build & Publish Testerloop Reporter Package 
+name: Build & Publish Testerloop CLI Package 
 
 on:
   workflow_dispatch:
