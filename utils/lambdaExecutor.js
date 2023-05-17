@@ -4,6 +4,7 @@ const {
   getRunId,
   setExitCode,
   clearFeaturePath,
+  findArrayDifference,
 } = require("./helper");
 const glob = require("glob");
 const { checkFileExistsInS3 } = require("./s3");
@@ -13,6 +14,7 @@ const {
   getInputData,
   getS3RunPath,
   getEnvVariableValuesFromCi,
+  determineFilePropertiesBasedOnTags,
 } = require("./handlers");
 const { cucumberSlicer } = require("cucumber-cypress-slicer");
 const colors = require("colors");
@@ -27,6 +29,7 @@ async function executeLambdas() {
     s3BucketName,
     customPath,
     envVariablesLambda,
+    tag,
   } = await getInputData();
 
   // Slice the cucumber files
@@ -37,7 +40,47 @@ async function executeLambdas() {
   const files = glob
     .sync(`./cypress/e2e/parsed/cypress/e2e/*.feature`)
     .map((file) => `${file}`);
-  console.log("LOG: Found files to execute: ", files);
+
+  // Determine the final files based on the tags
+  const filesToIncludeBasedOnTags = [];
+  const filesToExcludeBasedOnTags = [];
+  files.forEach((file) => {
+    const { unWipedScenarios, fileHasTag } = determineFilePropertiesBasedOnTags(
+      file,
+      tag
+    );
+
+    // If scenario has desired included tags add it to included list
+    if (fileHasTag && tag !== undefined) {
+      filesToIncludeBasedOnTags.push(file);
+      // if scenario is wiped add the tag exists add it to excluded list
+    }
+    if (!unWipedScenarios && tag !== undefined) {
+      filesToExcludeBasedOnTags.push(file);
+    }
+
+    // In case where no tag exists all files are included
+    if (tag === undefined) {
+      filesToIncludeBasedOnTags.push(file);
+    }
+  });
+
+  // Cut off all the ones which should be excluded
+  finalFilesToSendToLambda = findArrayDifference(
+    filesToIncludeBasedOnTags,
+    filesToExcludeBasedOnTags
+  );
+
+  if (tag) {
+    console.log(
+      "LOG: Found files to execute matching tag criteria: '",
+      tag + "'",
+      "\nLOG: Files found: ",
+      finalFilesToSendToLambda
+    );
+  } else {
+    console.log("LOG: Found files to execute: ", finalFilesToSendToLambda);
+  }
 
   // Create the reporter variables to pass on to the reporter
   // Leave request id undefined so it can get the one from the lamdba process.env
@@ -57,10 +100,12 @@ async function executeLambdas() {
     envVars[item.name] = item.value;
   });
 
-  console.log("userEnvVarsWithValues: ", envVars);
-
   // Send the events to the lambda
-  const results = await sendEventsToLambda(files, lambdaArn, envVars);
+  const results = await sendEventsToLambda(
+    finalFilesToSendToLambda,
+    lambdaArn,
+    envVars
+  );
 
   // Push the results into an array to handle later for polling
   let requestIdsToCheck = [];
@@ -70,11 +115,11 @@ async function executeLambdas() {
     console.log(
       colors.cyan("Test id: "),
       result.$metadata.requestId,
-      `   ${clearFeaturePath(files[index])}`
+      `   ${clearFeaturePath(finalFilesToSendToLambda[index])}`
     );
     let test = {
       tlTestId: JSON.stringify(result.$metadata.requestId).replaceAll('"', ""),
-      fileName: files[index],
+      fileName: finalFilesToSendToLambda[index],
       result: "running",
       startDate: Date.now(),
     };

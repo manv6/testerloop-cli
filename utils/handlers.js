@@ -4,7 +4,10 @@ const {
   getExitCode,
   clearValues,
   getFailedTests,
+  categorizeTags,
+  checkIfAllWiped,
   createFailedLinks,
+  checkIfContainsTag,
   readConfigurationFIle,
 } = require("./helper");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
@@ -103,6 +106,7 @@ async function getInputData() {
     reporterBaseUrl: configurationData?.reporterBaseUrl,
     customCommand: customCommand || "",
     help: help,
+    ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
   };
 }
 
@@ -139,6 +143,33 @@ const parseArguments = async () => {
   // if (cliArgs[1] !== "run") cliArgs.splice(1, 0, "run");
   return cliArgs;
 };
+
+function determineFilePropertiesBasedOnTags(file, tag) {
+  // If tag exists then determine based on the tags
+  // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
+  let unWipedScenarios;
+  let fileHasTag;
+  let tagsIncludedExcluded;
+  if (tag) {
+    tagsIncludedExcluded = categorizeTags(tag);
+
+    tagsIncludedExcluded.includedTags.forEach((tag) => {
+      if (!fileHasTag) {
+        fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
+      }
+    });
+    let result = [];
+    tagsIncludedExcluded.excludedTags.forEach((tag) => {
+      result.push(checkIfAllWiped(file, tag));
+    });
+    unWipedScenarios = result.includes(false) ? false : true;
+
+    return { fileHasTag, unWipedScenarios, tagsIncludedExcluded };
+  } else {
+    unWipedScenarios = true;
+    return { unWipedScenarios };
+  }
+}
 
 async function clearTheArgs(argsToRemoveArray) {
   return await parseArguments().then((cliArgs) => {
@@ -212,4 +243,5 @@ module.exports = {
   handleExecutionTypeInput,
   getEnvVariableValuesFromCi,
   createAndUploadCICDFileToS3Bucket,
+  determineFilePropertiesBasedOnTags,
 };

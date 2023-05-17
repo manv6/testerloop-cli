@@ -3,14 +3,10 @@ const {
   handleResult,
   getInputData,
   getEnvVariableValuesFromCi,
+  determineFilePropertiesBasedOnTags,
 } = require("./handlers");
 const { sendCommandToEcs, ecsClient } = require("./taskProcessor");
-const {
-  checkIfAllWiped,
-  checkIfContainsTag,
-  getRunId,
-  categorizeTags,
-} = require("./helper");
+const { getRunId } = require("./helper");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 
 async function executeEcs() {
@@ -28,6 +24,7 @@ async function executeEcs() {
     customPath,
     uploadFilesToS3,
     customCommand,
+    ecsPublicIp,
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
@@ -44,20 +41,9 @@ async function executeEcs() {
     files.map(async (file) => {
       const filename = file.split("/").pop();
       // Determine if the file is suitable for execution based on tags
-      const tagsIncludedExcluded = categorizeTags(tag);
-      let fileHasTag;
-      tagsIncludedExcluded.includedTags.forEach((tag) => {
-        if (!fileHasTag) {
-          fileHasTag =
-            tag !== undefined ? checkIfContainsTag(file, tag) : false;
-        }
-      });
 
-      let result = [];
-      tagsIncludedExcluded.excludedTags.forEach((tag) => {
-        result.push(checkIfAllWiped(file, tag));
-      });
-      let unWipedScenarios = result.includes(false) ? false : true;
+      const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
+        determineFilePropertiesBasedOnTags(file, tag);
 
       let envVariablesWithValueToPassOnCommand =
         getEnvVariableValuesFromCi(envVariablesECS);
@@ -93,7 +79,7 @@ async function executeEcs() {
           .replace(/%TEST_FILENAME\b/g, file.split("/").pop())}`.split(" ");
       } else {
         finalCommand =
-          `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
+          `timeout 2400 npx cypress run --browser chrome --spec ${file} --env TAGS=${tag}`.split(
             " "
           );
       }
@@ -110,7 +96,8 @@ async function executeEcs() {
             subnets,
             securityGroups,
             uploadToS3RoleArn,
-            envVariablesWithValueToPassOnCommand
+            envVariablesWithValueToPassOnCommand,
+            ecsPublicIp
           )
         );
       }

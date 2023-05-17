@@ -9,6 +9,15 @@ function wait(ms = 5000) {
   });
 }
 
+function findArrayDifference(array1, array2) {
+  return array1.filter((value) => !array2.includes(value));
+}
+
+function findArrayUnion(array1, array2) {
+  const combinedArray = array1.concat(array2);
+  return Array.from(new Set(combinedArray));
+}
+
 async function arraysHaveSameElements(id, res) {
   return new Promise((resolve, reject) => {
     if (id.every((id) => res.includes(`${id.requestId}/`))) {
@@ -251,8 +260,10 @@ module.exports = {
   showHelp,
   clearValues,
   getFailedTests,
+  findArrayUnion,
   categorizeTags,
   clearFeaturePath,
   createFailedLinks,
+  findArrayDifference,
   arraysHaveSameElements,
 };
