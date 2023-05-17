@@ -73,16 +73,17 @@ const fse = require("fs-extra");
 const path = require("path");
 const { syncFilesFromS3 } = require("./s3");
 
-async function getFailedTests(directory, prefix) {
+async function getTestPerState(directory, filePrefix, testState) {
   let responseArray = [];
 
   try {
     const files = await fse.readdir(directory);
 
     for (const file of files) {
-      if (file.startsWith(prefix)) {
+      if (file.startsWith(filePrefix)) {
         const json = await fse.readJSON(path.join(directory, file));
-        for (const contents of json) {
+        const filteredData = json.filter((item) => item.status === testState);
+        for (const contents of filteredData) {
           responseArray.push(contents);
         }
       }
@@ -105,6 +106,14 @@ async function createFailedLinks(failedTests, orgURL) {
         colors.magenta(`${orgURL}/run/${getRunId()}/test/${failed.testId}`)
     );
   }
+  line();
+}
+
+async function createRunLinks(orgURL) {
+  const colors = require("colors");
+  colors.enable();
+  line();
+  console.log(colors.green(`Testerloop URL: ${orgURL}/run/${getRunId()}`));
   line();
 }
 
@@ -259,8 +268,9 @@ module.exports = {
   line,
   showHelp,
   clearValues,
-  getFailedTests,
   findArrayUnion,
+  getTestPerState,
+  createRunLinks,
   categorizeTags,
   clearFeaturePath,
   createFailedLinks,

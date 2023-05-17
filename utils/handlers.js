@@ -3,9 +3,10 @@ const {
   setExitCode,
   getExitCode,
   clearValues,
-  getFailedTests,
   categorizeTags,
   checkIfAllWiped,
+  getTestPerState,
+  createRunLinks,
   createFailedLinks,
   checkIfContainsTag,
   readConfigurationFIle,
@@ -30,21 +31,43 @@ let executionType;
 async function handleResult(bucket, customPath) {
   // If the exit code is already known, ignore (timeout case)
   if (!getExitCode()) {
-    // Grab the failed files from the s3 and store them locally
-    await syncFilesFromS3(
-      `s3://${getS3RunPath()}/results`,
-      `logs/failedTestResults`
-    );
+    // Grab the files from the s3 and store them locally to get results
+    try {
+      await syncFilesFromS3(
+        `s3://${getS3RunPath()}/results`,
+        `logs/testResults`
+      );
+      const directory = `./logs/testResults/${getS3RunPath().replace(
+        bucket + "/",
+        ""
+      )}/results`;
+      const failedTestResults = await getTestPerState(
+        directory,
+        "testResults-",
+        "failed"
+      );
+      const passedTestResults = await getTestPerState(
+        directory,
+        "testResults-",
+        "passed"
+      );
 
-    // Iterate through the failed test files and determine the failed ids to create the links
-    const directory = `./logs/failedTestResults/${getS3RunPath().replace(
-      bucket + "/",
-      ""
-    )}/results`;
-    const failedTestResults = await getFailedTests(directory, "failed-");
-    await createFailedLinks(failedTestResults, getOrgUrl());
-    failedTestResults.length > 0 ? setExitCode(1) : setExitCode(0);
+      console.log("Failed Tests: ", failedTestResults);
+      console.log("Passed Tests: ", passedTestResults);
+
+      if (failedTestResults.length > 0) {
+        await createFailedLinks(failedTestResults, getOrgUrl());
+        setExitCode(1);
+      } else {
+        createRunLinks(getOrgUrl());
+        setExitCode(0);
+      }
+    } catch (err) {
+      console.log("Could not retrieve results from s3");
+      setExitCode(1);
+    }
   }
+
   process.exit(getExitCode());
 }
 
