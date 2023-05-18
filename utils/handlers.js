@@ -10,6 +10,9 @@ const {
   createFailedLinks,
   checkIfContainsTag,
   readConfigurationFIle,
+  getRerun,
+  getLatestFile,
+  getTestPerStateFromFile,
 } = require("./helper");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
 const arg = require("arg");
@@ -41,19 +44,41 @@ async function handleResult(bucket, customPath) {
         bucket + "/",
         ""
       )}/results`;
-      const failedTestResults = await getTestPerState(
-        directory,
-        "testResults-",
-        "failed"
-      );
-      const passedTestResults = await getTestPerState(
-        directory,
-        "testResults-",
-        "passed"
-      );
 
-      console.log("Failed Tests: ", failedTestResults);
-      console.log("Passed Tests: ", passedTestResults);
+      let failedTestResults;
+      let passedTestResults;
+
+      if (getRerun()) {
+        console.log("Retrieving rerun results...");
+
+        const testResultFileName = await getLatestFile(
+          directory,
+          "testResults-"
+        );
+        failedTestResults = await getTestPerStateFromFile(
+          directory,
+          testResultFileName,
+          "failed"
+        );
+        passedTestResults = await getTestPerStateFromFile(
+          directory,
+          testResultFileName,
+          "passed"
+        );
+      } else {
+        console.log("Retrieving results...");
+
+        failedTestResults = await getTestPerState(
+          directory,
+          "testResults-",
+          "failed"
+        );
+        passedTestResults = await getTestPerState(
+          directory,
+          "testResults-",
+          "passed"
+        );
+      }
 
       if (failedTestResults.length > 0) {
         await createFailedLinks(failedTestResults, getOrgUrl());
@@ -78,7 +103,13 @@ async function getInputData() {
   let configurationData = await readConfigurationFIle(".testerlooprc.json");
 
   // Override JSON data with CLI arguments
-  let specFiles, timeOutInSecs, executionTypeInput, tag, customCommand, help;
+  let specFiles,
+    timeOutInSecs,
+    executionTypeInput,
+    tag,
+    customCommand,
+    help,
+    rerun;
 
   for (let i = 0; i < cliArgs.length; i++) {
     switch (cliArgs[i]) {
@@ -100,6 +131,9 @@ async function getInputData() {
       case "--help":
       case "-h":
         help = true;
+        break;
+      case "--rerun":
+        rerun = true;
         break;
       default:
         break;
@@ -130,6 +164,7 @@ async function getInputData() {
     customCommand: customCommand || "",
     help: help,
     ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
+    rerun: rerun || false,
   };
 }
 
@@ -159,11 +194,7 @@ function getExecutionType() {
 }
 
 const parseArguments = async () => {
-  //force the arguments to be cypress run if they are not specified
   const cliArgs = args._;
-  // console.log("CLI Arguments:", cliArgs);
-  // if (cliArgs[0] !== "cypress") cliArgs.unshift("cypress");
-  // if (cliArgs[1] !== "run") cliArgs.splice(1, 0, "run");
   return cliArgs;
 };
 
@@ -197,10 +228,14 @@ function determineFilePropertiesBasedOnTags(file, tag) {
 async function clearTheArgs(argsToRemoveArray) {
   return await parseArguments().then((cliArgs) => {
     for (const argToRemove of argsToRemoveArray) {
-      const argIndex = cliArgs.indexOf(argToRemove);
+      const argIndex = cliArgs.indexOf(argToRemove.argName);
 
       if (argIndex !== -1 && argIndex < cliArgs.length - 1) {
-        cliArgs.splice(argIndex, 2);
+        if (argToRemove.hasValue) {
+          cliArgs.splice(argIndex, 2);
+        } else {
+          cliArgs.splice(argIndex, 1);
+        }
       }
     }
     return cliArgs;
@@ -208,7 +243,10 @@ async function clearTheArgs(argsToRemoveArray) {
 }
 
 async function createFinalCommand() {
-  let argsToRemove = ["--execute-on"];
+  let argsToRemove = [
+    { argName: "--execute-on", hasValue: true },
+    { argName: "--rerun", hasValue: false },
+  ];
 
   let clearedArgs = await clearTheArgs(argsToRemove);
   const finalCommand = "npx " + clearedArgs.join(" ");

@@ -1,7 +1,7 @@
 const { v4 } = require("uuid");
 const { readFileSync, readFile } = require("fs");
 
-let runId, orgURL, exitCode;
+let runId, orgURL, exitCode, rerun;
 
 function wait(ms = 5000) {
   return new Promise((resolve) => {
@@ -73,6 +73,32 @@ const fse = require("fs-extra");
 const path = require("path");
 const { syncFilesFromS3 } = require("./s3");
 
+async function getLatestFile(directory, filePrefix) {
+  try {
+    const files = await fse.readdir(directory);
+    const results = files.filter((file) => file.startsWith(filePrefix));
+
+    // Extract and convert timestamps, then sort in ascending order
+    var sortedTimestamps = results
+      .map(function (result) {
+        var timestamp = result.replace("testResults-", "").replace(".json", "");
+        return parseInt(timestamp, 10);
+      })
+      .sort(function (a, b) {
+        return b - a;
+      });
+    // Create a new array with sorted string items
+    var sortedItems = sortedTimestamps.map(function (timestamp) {
+      return "testResults-" + timestamp + ".json";
+    });
+    // Output the sorted items
+    return sortedItems[0];
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+
 async function getTestPerState(directory, filePrefix, testState) {
   let responseArray = [];
 
@@ -87,6 +113,22 @@ async function getTestPerState(directory, filePrefix, testState) {
           responseArray.push(contents);
         }
       }
+    }
+    return responseArray;
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+
+async function getTestPerStateFromFile(directory, fileName, testState) {
+  let responseArray = [];
+
+  try {
+    const json = await fse.readJSON(path.join(directory, fileName));
+    const filteredData = json.filter((item) => item.status === testState);
+    for (const contents of filteredData) {
+      responseArray.push(contents);
     }
     return responseArray;
   } catch (err) {
@@ -253,6 +295,14 @@ function showHelp() {
   );
 }
 
+function setRerun(rerunInput) {
+  rerun = rerunInput;
+}
+
+function getRerun() {
+  return rerun;
+}
+
 module.exports = {
   setRunId,
   getRunId,
@@ -276,4 +326,8 @@ module.exports = {
   createFailedLinks,
   findArrayDifference,
   arraysHaveSameElements,
+  setRerun,
+  getRerun,
+  getLatestFile,
+  getTestPerStateFromFile,
 };

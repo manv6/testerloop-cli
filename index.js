@@ -19,6 +19,7 @@ const {
   getRunId,
   setOrgUrl,
   showHelp,
+  setRerun,
 } = require("./utils/helper");
 
 async function main() {
@@ -29,10 +30,12 @@ async function main() {
     s3BucketName,
     customPath,
     help,
+    rerun,
   } = await getInputData();
   if (help) {
     showHelp(help);
   } else {
+    setRerun(rerun);
     handleExecutionTypeInput(executionTypeInput);
     // Set and org base url for the links & the runId
     setOrgUrl(reporterBaseUrl);
