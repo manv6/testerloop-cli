@@ -113,7 +113,7 @@ async function getInputData() {
 
   for (let i = 0; i < cliArgs.length; i++) {
     switch (cliArgs[i]) {
-      case "--spec":
+      case "--test-spec-folder":
         specFiles = cliArgs[i + 1];
         break;
       case "--lambdaTimeoutInSeconds":
@@ -122,7 +122,7 @@ async function getInputData() {
       case "--execute-on":
         executionTypeInput = cliArgs[i + 1];
         break;
-      case "--tag":
+      case "--filter-by-tag":
         tag = cliArgs[i + 1];
         break;
       case "--custom-command":

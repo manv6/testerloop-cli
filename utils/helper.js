@@ -235,6 +235,16 @@ function cleanInput(str) {
 
 function showHelp() {
   const colors = require("colors");
+
+  console.log(
+    colors.grey("[rerun]") +
+      ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome'
+  );
+  console.log(
+    "\t \t  --rerun: defines if there is a rerun mechanism for cypress"
+  );
+  console.log("\n");
+
   console.log(
     colors.blue("[local]") + " Usage  : npx tl cypress run ...cypress_options "
   );
@@ -261,7 +271,7 @@ function showHelp() {
   console.log(
     "\t \t  --spec:       select a folder of tests or a specific test"
   );
-  // console.log("\t \t  --tag: filter the feature files based on specific tags");
+
   console.log(
     "\t \t  --lambdaTimeoutInSeconds: The amount of time in seconds to wait for the lambdas to complete"
   );
@@ -279,10 +289,10 @@ function showHelp() {
   );
   console.log("\t \t  --execute-on: defines where to execute the tests");
   console.log(
-    "\t \t  --spec:       select a folder of tests or a specific test"
+    "\t \t  --test-spec-folder:       select a folder of tests or a specific test"
   );
   console.log(
-    "\t \t  --tag:        filter the feature files based on specific tags"
+    "\t \t  --filter-by-tag:        filter the feature files based on specific tags"
   );
   console.log(
     "\t \t  --custom-command: Send a custom command to an ecs task. example ( --custom-command 'npx cucumber-cypress-rerun --spec %TEST_FILE --browser chrome' ) "
