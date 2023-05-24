@@ -20,10 +20,18 @@ const {
   setOrgUrl,
   showHelp,
   setRerun,
+  setECSRegion,
+  setLambdaRegion,
+  setS3Region,
+  getS3Region,
+  getLambdaRegion,
+  getECSRegion,
 } = require("./utils/helper");
+const { initializeS3Client } = require("./utils/s3");
+const { initializeLambdaClient } = require("./utils/eventProcessor");
+const { initializeECSClient, ecsClient } = require("./utils/taskProcessor");
 
 async function main() {
-  // Determine execution type
   const {
     executionTypeInput,
     reporterBaseUrl,
@@ -31,7 +39,14 @@ async function main() {
     customPath,
     help,
     rerun,
+    s3Region,
+    ecsRegion,
+    lambdaRegion,
   } = await getInputData();
+  console.log(s3Region);
+  await setS3Region(s3Region);
+  await setECSRegion(ecsRegion);
+  await setLambdaRegion(lambdaRegion);
   if (help) {
     showHelp(help);
   } else {
@@ -41,6 +56,7 @@ async function main() {
     setOrgUrl(reporterBaseUrl);
     setRunId();
     setS3RunPath(s3BucketName, customPath, getRunId());
+    initializeS3Client(getS3Region());
     createAndUploadCICDFileToS3Bucket(s3BucketName);
     line();
     console.log("Your run id is: ", colors.magenta(getRunId()));
@@ -49,9 +65,11 @@ async function main() {
     // Execute
     switch (getExecutionType()) {
       case "lambda":
+        initializeLambdaClient(getLambdaRegion());
         await executeLambdas();
         break;
       case "ecs":
+        initializeECSClient(getECSRegion());
         await executeEcs();
         break;
       default:

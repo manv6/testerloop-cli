@@ -4,11 +4,18 @@ const {
   ListObjectsV2Command,
   HeadObjectCommand,
 } = require("@aws-sdk/client-s3");
+
 const S3SyncClient = require("s3-sync-client");
-const s3Client = new S3Client({ region: "eu-west-3" });
+let s3Client;
+
+function initializeS3Client(s3Region) {
+  s3Client = new S3Client({ region: s3Region });
+}
 
 async function syncFilesToS3(localPath, s3Path) {
-  const { sync } = new S3SyncClient({ client: s3Client });
+  const { sync } = new S3SyncClient({
+    client: s3CLient,
+  });
   try {
     console.log(`Begin syncing local files from ${localPath}`);
     await sync(localPath, s3Path);
@@ -90,4 +97,5 @@ module.exports = {
   uploadFileToS3,
   checkFileExistsInS3,
   listS3Folders,
+  initializeS3Client,
 };

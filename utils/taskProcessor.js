@@ -1,6 +1,14 @@
 const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
 
-const ecsClient = new ECSClient("eu-west-3");
+let ecsClient;
+
+function initializeECSClient(ecsRegion) {
+  ecsClient = new ECSClient(ecsRegion);
+}
+
+function getEcsClient() {
+  return ecsClient;
+}
 
 const launchType = "FARGATE";
 let assignPublicIp = "DISABLED";
@@ -44,4 +52,4 @@ async function sendCommandToEcs(
   });
 }
 
-module.exports = { sendCommandToEcs, ecsClient };
+module.exports = { sendCommandToEcs, getEcsClient, initializeECSClient };

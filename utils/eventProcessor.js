@@ -5,9 +5,13 @@ const {
   InvocationType,
 } = require("@aws-sdk/client-lambda");
 
-const client = new LambdaClient({
-  region: "eu-west-3",
-});
+let client;
+
+function initializeLambdaClient(lambdaRegion) {
+  client = new LambdaClient({
+    region: lambdaRegion,
+  });
+}
 
 async function sendEventsToLambda(files, lambdaArn, envVars) {
   return new Promise(async (resolve) => {
@@ -34,4 +38,4 @@ async function sendEventsToLambda(files, lambdaArn, envVars) {
   });
 }
 
-module.exports = { sendEventsToLambda };
+module.exports = { sendEventsToLambda, initializeLambdaClient };

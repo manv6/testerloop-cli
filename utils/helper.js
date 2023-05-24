@@ -1,7 +1,7 @@
 const { v4 } = require("uuid");
 const { readFileSync, readFile } = require("fs");
 
-let runId, orgURL, exitCode, rerun;
+let runId, orgURL, exitCode, rerun, s3Region, ecsRegion, lambdaRegion;
 
 function wait(ms = 5000) {
   return new Promise((resolve) => {
@@ -30,6 +30,29 @@ async function arraysHaveSameElements(id, res) {
 
 function getRunId() {
   return runId;
+}
+async function setS3Region(region) {
+  s3Region = region;
+}
+
+function getS3Region() {
+  return s3Region;
+}
+
+function getECSRegion() {
+  return ecsRegion;
+}
+
+async function setECSRegion(region) {
+  ecsRegion = region;
+}
+
+function getLambdaRegion() {
+  return lambdaRegion;
+}
+
+async function setLambdaRegion(region) {
+  lambdaRegion = region;
 }
 
 function getOrgUrl() {
@@ -340,4 +363,10 @@ module.exports = {
   getRerun,
   getLatestFile,
   getTestPerStateFromFile,
+  getECSRegion,
+  getS3Region,
+  getLambdaRegion,
+  setECSRegion,
+  setS3Region,
+  setLambdaRegion,
 };

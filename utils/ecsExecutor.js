@@ -5,7 +5,7 @@ const {
   getEnvVariableValuesFromCi,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
-const { sendCommandToEcs, ecsClient } = require("./taskProcessor");
+const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
 const { getRunId } = require("./helper");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 
@@ -127,7 +127,12 @@ async function executeEcs() {
     let waitECSTask;
     try {
       waitECSTask = await waitUntilTasksStopped(
-        { client: ecsClient, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
+        {
+          client: getEcsClient(),
+          maxWaitTime: 1200,
+          maxDelay: 10,
+          minDelay: 5,
+        },
         { cluster: clusterARN, tasks }
       );
     } catch (err) {

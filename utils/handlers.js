@@ -165,6 +165,9 @@ async function getInputData() {
     help: help,
     ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
     rerun: rerun || false,
+    s3Region: configurationData.reporter?.region,
+    ecsRegion: configurationData.ecs?.region,
+    lambdaRegion: configurationData.lambda?.region,
   };
 }
 
