@@ -7,7 +7,8 @@ const {
 } = require("./handlers");
 
 async function executeLocal() {
-  const { s3BucketName, customPath, uploadFilesToS3 } = await getInputData();
+  const { s3BucketName, customPath, uploadFilesToS3, s3Region } =
+    await getInputData();
 
   const reporterVariables = {
     TL_RUN_ID: getRunId(),
@@ -16,6 +17,7 @@ async function executeLocal() {
     TL_EXECUTE_FROM: "local",
     TL_CUSTOM_RESULTS_PATH: customPath,
     TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+    TL_S3_REGION: s3Region,
   };
 
   let reporterVariablesString = "";

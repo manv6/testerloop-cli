@@ -30,6 +30,7 @@ async function executeLambdas() {
     customPath,
     envVariablesLambda,
     tag,
+    s3Region,
   } = await getInputData();
 
   // Slice the cucumber files
@@ -91,6 +92,7 @@ async function executeLambdas() {
     CYPRESS_TL_EXECUTE_FROM: "lambda",
     CYPRESS_TL_CUSTOM_RESULTS_PATH: customPath,
     CYPRESS_TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+    CYPRESS_TL_S3_REGION: s3Region,
   };
 
   const envVars = { ...reporterVariables };

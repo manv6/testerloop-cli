@@ -25,6 +25,7 @@ async function executeEcs() {
     uploadFilesToS3,
     customCommand,
     ecsPublicIp,
+    s3Region,
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
@@ -55,6 +56,7 @@ async function executeEcs() {
         TL_EXECUTE_FROM: "local",
         TL_CUSTOM_RESULTS_PATH: customPath,
         TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+        TL_S3_REGION: s3Region,
       };
 
       // Add to the variables to be set on the container the reporter ones with CYPRESS_ prefix
