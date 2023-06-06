@@ -14,6 +14,7 @@ const {
   getInputData,
   getS3RunPath,
   getEnvVariableValuesFromCi,
+  getEnvVariableWithValues,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
 const { cucumberSlicer } = require("cucumber-cypress-slicer");
@@ -29,6 +30,7 @@ async function executeLambdas() {
     s3BucketName,
     customPath,
     envVariablesLambda,
+    envVariablesLambdaWithValues,
     tag,
     s3Region,
   } = await getInputData();
@@ -96,7 +98,10 @@ async function executeLambdas() {
   };
 
   const envVars = { ...reporterVariables };
-  let userEnvVarsWithValues = getEnvVariableValuesFromCi(envVariablesLambda);
+  let userEnvVarsWithValues = [
+    ...getEnvVariableValuesFromCi(envVariablesLambda),
+    ...getEnvVariableWithValues(envVariablesLambdaWithValues),
+  ];
 
   userEnvVarsWithValues.forEach((item) => {
     envVars[item.name] = item.value;

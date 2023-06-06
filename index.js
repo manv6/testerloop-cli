@@ -43,7 +43,6 @@ async function main() {
     ecsRegion,
     lambdaRegion,
   } = await getInputData();
-  console.log(s3Region);
   await setS3Region(s3Region);
   await setECSRegion(ecsRegion);
   await setLambdaRegion(lambdaRegion);

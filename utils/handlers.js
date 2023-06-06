@@ -155,6 +155,10 @@ async function getInputData() {
     uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
     envVariablesECS: configurationData.ecs?.envVariables || [],
     envVariablesLambda: configurationData.lambda?.envVariables || [],
+    envVariablesECSWithValues:
+      configurationData.ecs?.envVariablesWithValues || {},
+    envVariablesLambdaWithValues:
+      configurationData.lambda?.envVariablesWithValues || {},
     uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
     s3BucketName:
       configurationData.reporter?.s3BucketName ||
@@ -297,6 +301,20 @@ function getEnvVariableValuesFromCi(listOfVariables) {
   return listOfVariablesWithValues;
 }
 
+function getEnvVariableWithValues(jsonVariables) {
+  const listOfVariablesWithValues = [];
+  // Iterate over the object and extract the values
+  for (var key in jsonVariables) {
+    if (jsonVariables.hasOwnProperty(key)) {
+      listOfVariablesWithValues.push({
+        name: key,
+        value: jsonVariables[key],
+      });
+    }
+  }
+  return listOfVariablesWithValues;
+}
+
 module.exports = {
   handleResult,
   getInputData,
@@ -308,4 +326,5 @@ module.exports = {
   getEnvVariableValuesFromCi,
   createAndUploadCICDFileToS3Bucket,
   determineFilePropertiesBasedOnTags,
+  getEnvVariableWithValues,
 };

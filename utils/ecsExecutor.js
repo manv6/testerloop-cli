@@ -3,6 +3,7 @@ const {
   handleResult,
   getInputData,
   getEnvVariableValuesFromCi,
+  getEnvVariableWithValues,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
 const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
@@ -12,6 +13,7 @@ const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 async function executeEcs() {
   const {
     envVariablesECS,
+    envVariablesECSWithValues,
     specFiles,
     tag,
     containerName,
@@ -46,8 +48,10 @@ async function executeEcs() {
       const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
         determineFilePropertiesBasedOnTags(file, tag);
 
-      let envVariablesWithValueToPassOnCommand =
-        getEnvVariableValuesFromCi(envVariablesECS);
+      let envVariablesWithValueToPassOnCommand = [
+        ...getEnvVariableValuesFromCi(envVariablesECS),
+        ...getEnvVariableWithValues(envVariablesECSWithValues),
+      ];
 
       const reporterVariables = {
         TL_RUN_ID: getRunId(),
