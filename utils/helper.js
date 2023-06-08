@@ -165,20 +165,15 @@ async function createFailedLinks(failedTests, orgURL) {
   colors.enable();
   line();
   for (const failed of failedTests) {
-    console.log(
-      colors.red(`Test failed: `) +
-        `${failed.title} ` +
-        colors.magenta(`${orgURL}/run/${getRunId()}/test/${failed.testId}`)
-    );
+    const failedUrl = `${orgURL}/run/${getRunId()}/test/${failed.testId}`;
+    console.log(`Test failed: ${failed.title} `, failedUrl);
   }
   line();
 }
 
 async function createRunLinks(orgURL) {
-  const colors = require("colors");
-  colors.enable();
   line();
-  console.log(colors.green(`Testerloop URL: ${orgURL}/run/${getRunId()}`));
+  console.log(`Testerloop URL: ${orgURL}/run/${getRunId()}`);
   line();
 }
 

@@ -39,9 +39,10 @@ async function executeLambdas() {
   let filesToExecute = specFiles.includes(".feature")
     ? specFiles
     : specFiles + "/*.feature";
+
   await cucumberSlicer(filesToExecute, `./cypress/e2e/parsed/`);
   const files = glob
-    .sync(`./cypress/e2e/parsed/cypress/e2e/*.feature`)
+    .sync(`./cypress/e2e/parsed/${filesToExecute.replace("cypress/e2e/", "")}`)
     .map((file) => `${file}`);
 
   // Determine the final files based on the tags

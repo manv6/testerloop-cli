@@ -87,7 +87,7 @@ async function checkFileExistsInS3(bucketName, key) {
       return true;
     }
   } catch (err) {
-    console.log(`Waiting for file ${key} to be completed`);
+    console.log(`Waiting for file ${key} to be uploaded`);
   }
 }
 
