@@ -15,9 +15,13 @@ const {
   getS3RunPath,
   getEnvVariableValuesFromCi,
   getEnvVariableWithValues,
-  determineFilePropertiesBasedOnTags,
 } = require("./handlers");
-const { cucumberSlicer } = require("cucumber-cypress-slicer");
+const {
+  sliceFeatureFilesRecursively,
+} = require("../utils/slicer_functions/lambdaSlicer");
+const {
+  filterFeatureFilesByTag,
+} = require("../utils/filter_functions/lambdaFilter");
 const colors = require("colors");
 colors.enable();
 
@@ -35,57 +39,13 @@ async function executeLambdas() {
     s3Region,
   } = await getInputData();
 
-  // Slice the cucumber files
-  let filesToExecute = specFiles.includes(".feature")
-    ? specFiles
-    : specFiles + "/*.feature";
-
-  await cucumberSlicer(filesToExecute, `./cypress/e2e/parsed/`);
-  const files = glob
-    .sync(`./cypress/e2e/parsed/${filesToExecute.replace("cypress/e2e/", "")}`)
-    .map((file) => `${file}`);
-
-  // Determine the final files based on the tags
-  const filesToIncludeBasedOnTags = [];
-  const filesToExcludeBasedOnTags = [];
-  files.forEach((file) => {
-    const { unWipedScenarios, fileHasTag } = determineFilePropertiesBasedOnTags(
-      file,
-      tag
-    );
-
-    // If scenario has desired included tags add it to included list
-    if (fileHasTag && tag !== undefined) {
-      filesToIncludeBasedOnTags.push(file);
-      // if scenario is wiped add the tag exists add it to excluded list
-    }
-    if (!unWipedScenarios && tag !== undefined) {
-      filesToExcludeBasedOnTags.push(file);
-    }
-
-    // In case where no tag exists all files are included
-    if (tag === undefined) {
-      filesToIncludeBasedOnTags.push(file);
-    }
-  });
-
-  // Cut off all the ones which should be excluded
-  finalFilesToSendToLambda = findArrayDifference(
-    filesToIncludeBasedOnTags,
-    filesToExcludeBasedOnTags
+  // Get the sliced files based on the provided path and filter them by tag
+  const slicedFiles = await sliceFeatureFilesRecursively(specFiles);
+  const finalFilesToSendToLambda = await filterFeatureFilesByTag(
+    slicedFiles,
+    tag
   );
-
-  if (tag) {
-    console.log(
-      "LOG: Found files to execute matching tag criteria: '",
-      tag + "'",
-      "\nLOG: Files found: ",
-      finalFilesToSendToLambda
-    );
-  } else {
-    console.log("LOG: Found files to execute: ", finalFilesToSendToLambda);
-  }
-
+  
   // Create the reporter variables to pass on to the reporter
   // Leave request id undefined so it can get the one from the lamdba process.env
   const reporterVariables = {
@@ -123,7 +83,7 @@ async function executeLambdas() {
     console.log(
       colors.cyan("Test id: "),
       result.$metadata.requestId,
-      `   ${clearFeaturePath(finalFilesToSendToLambda[index])}`
+      `   ${finalFilesToSendToLambda[index]}`
     );
     let test = {
       tlTestId: JSON.stringify(result.$metadata.requestId).replaceAll('"', ""),

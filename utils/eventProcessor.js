@@ -23,7 +23,7 @@ async function sendEventsToLambda(files, lambdaArn, envVars) {
             FunctionName: lambdaArn,
             InvocationType: InvocationType.Event,
             Payload: JSON.stringify({
-              spec: file.replace("cypress/e2e/parsed/", ""),
+              spec: file,
               envVars,
             }),
             LogType: LogType.Tail,
