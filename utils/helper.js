@@ -78,7 +78,7 @@ function setOrgUrl(orgUrl) {
 
 function line() {
   console.log(
-    "----------------------------------------------------------------------------------------------------------"
+    "----------------------------------------------------------------------------------------------------------------------------"
   );
 }
 
@@ -116,6 +116,32 @@ async function getLatestFile(directory, filePrefix) {
     });
     // Output the sorted items
     return sortedItems[0];
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+
+async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
+  let responseArray = [];
+
+  try {
+    const files = await fse.readdir(directory);
+
+    for (const file of files) {
+      if (file.startsWith(filePrefix)) {
+        const json = await fse.readJSON(path.join(directory, file));
+        for (const testIdToCheck of listOfTestsToCheck) {
+          const filteredData = json.filter(
+            (item) => item.testId === testIdToCheck
+          );
+          for (const contents of filteredData) {
+            responseArray.push(contents);
+          }
+        }
+      }
+    }
+    return responseArray;
   } catch (err) {
     console.error(err);
     return [];
@@ -163,7 +189,6 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
 async function createFailedLinks(failedTests, orgURL) {
   const colors = require("colors");
   colors.enable();
-  line();
   for (const failed of failedTests) {
     const failedUrl = `${orgURL}/run/${getRunId()}/test/${failed.testId}`;
     console.log(`Test failed: ${failed.title} `, failedUrl);
@@ -173,7 +198,7 @@ async function createFailedLinks(failedTests, orgURL) {
 
 async function createRunLinks(orgURL) {
   line();
-  console.log(`Testerloop URL: ${orgURL}/run/${getRunId()}`);
+  console.log(`Testerloop run URL: ${orgURL}/run/${getRunId()}`);
   line();
 }
 
@@ -348,6 +373,7 @@ module.exports = {
   clearValues,
   findArrayUnion,
   getTestPerState,
+  getTestStatesPerId,
   createRunLinks,
   categorizeTags,
   clearFeaturePath,

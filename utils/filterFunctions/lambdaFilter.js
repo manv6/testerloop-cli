@@ -9,7 +9,7 @@ async function filterFeatureFilesByTag(featureFiles, tag) {
     const { unWipedScenarios, fileHasTag } = determineFilePropertiesBasedOnTags(
       file,
       tag
-    );
+  );
 
     // Replace the parsed path before sending it to the lambda executor.
     file = file.replace("cypress/e2e/parsed/", "");
@@ -37,13 +37,13 @@ async function filterFeatureFilesByTag(featureFiles, tag) {
 
   if (tag) {
     console.log(
-      "LOG: Found files to execute matching tag criteria: '",
+      "Found files to execute matching tag criteria: '",
       tag + "'",
-      "\nLOG: Files found: ",
+      "\nFiles found: ",
       finalFiles
     );
   } else {
-    console.log("LOG: Found files to execute: ", finalFiles);
+    console.log("Found files to execute: ", finalFiles);
   }
 
   return finalFiles;

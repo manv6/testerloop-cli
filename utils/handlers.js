@@ -12,8 +12,10 @@ const {
   readConfigurationFIle,
   getRerun,
   getLatestFile,
+  getTestStatesPerId,
   getTestPerStateFromFile,
 } = require("./helper");
+const { sendEventsToLambda } = require("./eventProcessor");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
 const arg = require("arg");
 let s3RunPath;
@@ -31,69 +33,119 @@ function setS3RunPath(s3BucketName, customPath, runId) {
 const args = arg({}, { permissive: true });
 let executionType;
 
-async function handleResult(bucket, customPath) {
-  // If the exit code is already known, ignore (timeout case)
-  if (!getExitCode()) {
-    // Grab the files from the s3 and store them locally to get results
-    try {
-      await syncFilesFromS3(
-        `s3://${getS3RunPath()}/results`,
-        `logs/testResults`
+async function handleResult(bucket) {
+  const debug = require("debug")("s3");
+  // Grab the files from the s3 and store them locally to get results
+  const directory = `./logs/testResults/${getS3RunPath().replace(
+    bucket + "/",
+    ""
+  )}/results`;
+  try {
+    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+  } catch (err) {
+    console.log("Could not retrieve results from s3");
+    debug("ERROR fetching results from s3", err);
+    setExitCode(1);
+  }
+
+  try {
+    let failedTestResults;
+    let passedTestResults;
+
+    if (getRerun()) {
+      console.log("Retrieving rerun results...");
+
+      const testResultFileName = await getLatestFile(directory, "testResults-");
+      failedTestResults = await getTestPerStateFromFile(
+        directory,
+        testResultFileName,
+        "failed"
       );
-      const directory = `./logs/testResults/${getS3RunPath().replace(
-        bucket + "/",
-        ""
-      )}/results`;
+      passedTestResults = await getTestPerStateFromFile(
+        directory,
+        testResultFileName,
+        "passed"
+      );
+    } else {
+      console.log("Retrieving results...");
 
-      let failedTestResults;
-      let passedTestResults;
-
-      if (getRerun()) {
-        console.log("Retrieving rerun results...");
-
-        const testResultFileName = await getLatestFile(
-          directory,
-          "testResults-"
-        );
-        failedTestResults = await getTestPerStateFromFile(
-          directory,
-          testResultFileName,
-          "failed"
-        );
-        passedTestResults = await getTestPerStateFromFile(
-          directory,
-          testResultFileName,
-          "passed"
-        );
-      } else {
-        console.log("Retrieving results...");
-
-        failedTestResults = await getTestPerState(
-          directory,
-          "testResults-",
-          "failed"
-        );
-        passedTestResults = await getTestPerState(
-          directory,
-          "testResults-",
-          "passed"
-        );
-      }
-
-      if (failedTestResults.length > 0) {
-        await createFailedLinks(failedTestResults, getOrgUrl());
-        setExitCode(1);
-      } else {
-        createRunLinks(getOrgUrl());
-        setExitCode(0);
-      }
-    } catch (err) {
-      console.log("Could not retrieve results from s3");
-      setExitCode(1);
+      failedTestResults = await getTestPerState(
+        directory,
+        "testResults-",
+        "failed"
+      );
+      passedTestResults = await getTestPerState(
+        directory,
+        "testResults-",
+        "passed"
+      );
     }
+    createRunLinks(getOrgUrl());
+    if (failedTestResults.length > 0) {
+      await createFailedLinks(failedTestResults, getOrgUrl());
+      setExitCode(1);
+    } else {
+      setExitCode(0);
+    }
+  } catch (err) {
+    console.log(
+      "There was an error trying to parse your result files. Please check your s3 and reporter configuration "
+    );
+    debug("ERROR parsing result files from local folder", err);
   }
 
   process.exit(getExitCode());
+}
+
+async function getFailedLambdaTestResultsFromLocal(bucket) {
+  const directory = `./logs/testResults/${getS3RunPath().replace(
+    bucket + "/",
+    ""
+  )}/results`;
+  try {
+    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+  } catch (err) {
+    console.log("Could not retrieve results from s3");
+    debug("ERROR fetching results from s3", err);
+    setExitCode(1);
+  }
+
+  let failedTestResults = await getTestPerState(
+    directory,
+    "testResults-",
+    "failed"
+  );
+
+  const filePaths = [];
+  for (const test of failedTestResults) {
+    filePaths.push(test.pathToTest.replace("cypress/e2e/parsed/", ""));
+  }
+
+  return filePaths;
+}
+
+async function getLambdaTestResultsFromLocalBasedOnId(
+  bucket,
+  listOfTestIdsToCheckResults
+) {
+  const directory = `./logs/testResults/${getS3RunPath().replace(
+    bucket + "/",
+    ""
+  )}/results`;
+  try {
+    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+  } catch (err) {
+    console.log("Could not retrieve results from s3");
+    debug("ERROR fetching results from s3", err);
+    setExitCode(1);
+  }
+
+  let results = await getTestStatesPerId(
+    directory,
+    "testResults-",
+    listOfTestIdsToCheckResults
+  );
+  return results;
 }
 
 async function getInputData() {
@@ -104,10 +156,12 @@ async function getInputData() {
 
   // Override JSON data with CLI arguments
   let specFiles,
-    timeOutInSecs,
+    lambdaTimeOutSecs,
     executionTypeInput,
+    executionTimeOutSecs,
     tag,
     customCommand,
+    lambdaThreads,
     help,
     rerun;
 
@@ -117,7 +171,10 @@ async function getInputData() {
         specFiles = cliArgs[i + 1];
         break;
       case "--lambdaTimeoutInSeconds":
-        timeOutInSecs = cliArgs[i + 1];
+        lambdaTimeOutSecs = cliArgs[i + 1];
+        break;
+      case "--executionTimeOutSecs":
+        executionTimeOutSecs = cliArgs[i + 1];
         break;
       case "--execute-on":
         executionTypeInput = cliArgs[i + 1];
@@ -127,6 +184,9 @@ async function getInputData() {
         break;
       case "--custom-command":
         customCommand = cliArgs[i + 1];
+        break;
+      case "--lambda-threads":
+        lambdaThreads = cliArgs[i + 1];
         break;
       case "--help":
       case "-h":
@@ -143,9 +203,12 @@ async function getInputData() {
     specFiles: specFiles,
     lambdaArn: configurationData.lambda?.lambdaArn,
     testerLoopKeyId: configurationData.testerLoopKeyId,
+    executionTimeOutSecs: configurationData.executionTimeOutSecs || 1200,
     tag: tag,
-    timeOutInSecs:
-      timeOutInSecs || configurationData.lambda?.timeOutInSecs || 120,
+    lambdaTimeOutSecs:
+      lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
+    lambdaThreads:
+      lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
     executionTypeInput: executionTypeInput,
     containerName: configurationData.ecs?.containerName,
     clusterARN: configurationData.ecs?.clusterARN,
@@ -315,16 +378,120 @@ function getEnvVariableWithValues(jsonVariables) {
   return listOfVariablesWithValues;
 }
 
+async function handleExecutionTimeout(timeCounter) {
+  const colors = require("colors");
+  colors.enable();
+  const { executionTimeOutSecs } = await getInputData();
+  if (timeCounter >= executionTimeOutSecs) {
+    setExitCode(1);
+    console.log(
+      colors.red(
+        "Execution timed out after " +
+          executionTimeOutSecs +
+          " seconds. Results may vary"
+      )
+    );
+    return true;
+  } else return false;
+}
+
+async function checkLambdaHasTimedOut(test, lambdaTimeOutSecs) {
+  const timeNow = Date.now();
+  if (timeNow - test.startDate < lambdaTimeOutSecs * 1000) {
+    return false;
+  } else {
+    console.log(
+      `- Lambda '${test.tlTestId}' has timed out after ${lambdaTimeOutSecs} seconds`
+    );
+    return true;
+  }
+}
+
+function removeTestFromList(listOfTests, test) {
+  // find the index of the object you want to remove
+  let index = listOfTests.findIndex((obj) => obj.tlTestId === test.tlTestId);
+
+  // remove the object from the array using splice()
+  if (index !== -1) {
+    listOfTests.splice(index, 1);
+  }
+}
+
+/* 
+  // Returns a list of all the files sent to the lambdas
+  */
+async function sendTestsToLambdasBasedOnAvailableSlots(
+  allFilesToBeSent,
+  availableSlots,
+  testsSentSoFar,
+  lambdaThreads,
+  lambdaArn,
+  envVariables
+) {
+  const debug = require("debug")("THROTTLING");
+  let listOfFilesToSend = [];
+  let tempResults = [];
+  let numberOfTestFilesSent = testsSentSoFar;
+  let requestIdsToCheck = [];
+
+  // Safeguard. Hard cap the number of available tests you can execute
+  if (availableSlots > lambdaThreads) {
+    availableSlots = lambdaThreads;
+  }
+
+  // If there are slots, send the events and store the results in a listToCheck array
+  if (availableSlots > 0 && testsSentSoFar < allFilesToBeSent.length) {
+    for (let i = 0; i < availableSlots; i++) {
+      if (numberOfTestFilesSent < allFilesToBeSent.length) {
+        // Start adding files where we left off from prev iteration
+        listOfFilesToSend.push(allFilesToBeSent[testsSentSoFar + i]);
+        numberOfTestFilesSent++;
+      }
+    }
+    debug("List of files to be sent on this iteration: ", listOfFilesToSend);
+
+    tempResults = await sendEventsToLambda(
+      listOfFilesToSend,
+      lambdaArn,
+      envVariables
+    );
+
+    tempResults.forEach((result, index) => {
+      console.log(
+        `-> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`
+      );
+
+      let test = {
+        tlTestId: JSON.stringify(result.$metadata.requestId).replaceAll(
+          '"',
+          ""
+        ),
+        fileName: listOfFilesToSend[index],
+        result: "running",
+        startDate: Date.now(),
+      };
+      requestIdsToCheck.push(test);
+    });
+  }
+  return requestIdsToCheck;
+}
+
 module.exports = {
   handleResult,
   getInputData,
   getS3RunPath,
   setS3RunPath,
   getExecutionType,
+  handleExecutionTimeout,
+  removeTestFromList,
+  checkLambdaHasTimedOut,
   createFinalCommand,
   handleExecutionTypeInput,
   getEnvVariableValuesFromCi,
   createAndUploadCICDFileToS3Bucket,
+  getLambdaTestResultsFromLocalBasedOnId,
   determineFilePropertiesBasedOnTags,
+  sendTestsToLambdasBasedOnAvailableSlots,
+  getFailedLambdaTestResultsFromLocal,
   getEnvVariableWithValues,
 };

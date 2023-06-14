@@ -47,18 +47,38 @@ async function listS3Folders(bucketName, folderPath) {
   }
 }
 
-async function syncFilesFromS3(s3Path, localPath) {
+async function syncFilesFromS3(s3Path, localPath, retryCount = 0) {
   const { sync } = new S3SyncClient({ client: s3Client });
-  try {
-    await sync(s3Path, localPath);
-  } catch (error) {
-    console.log(
-      "Failed to grab failed test files from ",
-      s3Path,
-      "Error: ",
-      error
-    );
-  }
+
+  const retryDelay = 1000; // Retry delay in milliseconds
+  const maxRetries = 3; // Maximum number of retries
+
+  return new Promise(async (resolve, reject) => {
+    const syncFiles = async () => {
+      try {
+        console.log(
+          `Begin syncing log files from s3 to local path '${localPath}'`
+        );
+        await sync(s3Path, localPath);
+        console.log(`Finish syncing s3 folder to local path`);
+        resolve();
+      } catch (error) {
+        console.log(
+          `Failed to sync files from s3 to local path '${localPath}'`
+        );
+
+        if (retryCount < maxRetries) {
+          console.log(`Retrying (${retryCount + 1}/${maxRetries})...`);
+          setTimeout(syncFiles, retryDelay);
+          retryCount++;
+        } else {
+          console.log(`Maximum retries reached. Aborting sync.`);
+          reject(new Error("Maximum retries reached")); // Reject the promise when maximum retries are reached
+        }
+      }
+    };
+    await syncFiles();
+  });
 }
 
 async function uploadFileToS3(bucket, key, body) {
@@ -70,7 +90,7 @@ async function uploadFileToS3(bucket, key, body) {
   try {
     console.log(`Begin uploading file '${key}'`);
     await s3Client.send(new PutObjectCommand(params));
-    console.log(`Finish uploading file '${key}' to bucket '${bucket}'`);
+    console.log(`+ Finished uploading file '${key}' to bucket '${bucket}'`);
   } catch (error) {
     console.log("Failed to upload files", error);
   }
@@ -87,7 +107,7 @@ async function checkFileExistsInS3(bucketName, key) {
       return true;
     }
   } catch (err) {
-    console.log(`Waiting for file ${key} to be uploaded`);
+    // console.log(`Waiting for file ${key} to be uploaded`);
   }
 }
 

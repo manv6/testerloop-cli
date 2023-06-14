@@ -26,6 +26,7 @@ const {
   getS3Region,
   getLambdaRegion,
   getECSRegion,
+  getOrgUrl,
 } = require("./utils/helper");
 const { initializeS3Client } = require("./utils/s3");
 const { initializeLambdaClient } = require("./utils/eventProcessor");
@@ -58,7 +59,10 @@ async function main() {
     initializeS3Client(getS3Region());
     createAndUploadCICDFileToS3Bucket(s3BucketName);
     line();
-    console.log("Your run id is: ", colors.magenta(getRunId()));
+    console.log(
+      "Your run id is: ",
+      colors.magenta(getRunId()) + "  -> " + `${getOrgUrl()}/run/${getRunId()}`
+    );
     line();
 
     // Execute
