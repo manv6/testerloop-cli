@@ -17,7 +17,7 @@ const {
 } = require("./handlers");
 const {
   sliceFeatureFilesRecursively,
-} = require("../utils/slicer_functions/lambdaSlicer");
+} = require("../utils/slicerFunctions/lambdaSlicer");
 const { filterFeatureFilesByTag } = require("./filterFunctions/lambdaFilter");
 const colors = require("colors");
 const {
