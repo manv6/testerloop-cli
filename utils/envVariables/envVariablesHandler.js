@@ -41,6 +41,48 @@ async function getLambdaEnvVariables() {
   return envVars;
 }
 
+async function getEcsEnvVariables() {
+  const {
+    envVariablesECS,
+    envVariablesECSWithValues,
+    s3BucketName,
+    customPath,
+    uploadFilesToS3,
+    s3Region,
+  } = await getInputData();
+
+  let envVariablesWithValueToPassOnCommand = [
+    ...getEnvVariableValuesFromCi(envVariablesECS),
+    ...getEnvVariableWithValues(envVariablesECSWithValues),
+  ];
+
+  const reporterBaseVariables = {
+    TL_RUN_ID: getRunId(),
+    TL_TEST_ID: undefined,
+    TL_S3_BUCKET_NAME: s3BucketName,
+    TL_EXECUTE_FROM: "local",
+    TL_CUSTOM_RESULTS_PATH: customPath,
+    TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
+    TL_S3_REGION: s3Region,
+  };
+  reporterBaseVariables["TL_EXECUTE_FROM"] = "ecs";
+  // Add to the variables to be set on the container the reporter ones with CYPRESS_ prefix
+  const reporterVariablesAsCypressVariables = Object.entries(
+    reporterBaseVariables
+  )
+    .filter(([_, value]) => value !== undefined)
+    .map(([key, value]) => ({
+      name: "CYPRESS_" + key,
+      value: value.toString(),
+    }));
+  envVariablesWithValueToPassOnCommand =
+    envVariablesWithValueToPassOnCommand.concat(
+      reporterVariablesAsCypressVariables
+    );
+  return envVariablesWithValueToPassOnCommand;
+}
+
 module.exports = {
   getLambdaEnvVariables,
+  getEcsEnvVariables,
 };

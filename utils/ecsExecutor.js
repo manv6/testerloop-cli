@@ -2,18 +2,14 @@ const glob = require("glob");
 const {
   handleResult,
   getInputData,
-  getEnvVariableValuesFromCi,
-  getEnvVariableWithValues,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
+const { getEcsEnvVariables } = require("./envVariables/envVariablesHandler");
 const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
-const { getRunId } = require("./helper");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 
 async function executeEcs() {
   const {
-    envVariablesECS,
-    envVariablesECSWithValues,
     specFiles,
     tag,
     containerName,
@@ -24,10 +20,8 @@ async function executeEcs() {
     uploadToS3RoleArn,
     s3BucketName,
     customPath,
-    uploadFilesToS3,
     customCommand,
     ecsPublicIp,
-    s3Region,
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
@@ -48,35 +42,7 @@ async function executeEcs() {
       const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
         determineFilePropertiesBasedOnTags(file, tag);
 
-      let envVariablesWithValueToPassOnCommand = [
-        ...getEnvVariableValuesFromCi(envVariablesECS),
-        ...getEnvVariableWithValues(envVariablesECSWithValues),
-      ];
-
-      const reporterVariables = {
-        TL_RUN_ID: getRunId(),
-        TL_TEST_ID: undefined,
-        TL_S3_BUCKET_NAME: s3BucketName,
-        TL_EXECUTE_FROM: "local",
-        TL_CUSTOM_RESULTS_PATH: customPath,
-        TL_UPLOAD_RESULTS_TO_S3: uploadFilesToS3,
-        TL_S3_REGION: s3Region,
-      };
-
-      // Add to the variables to be set on the container the reporter ones with CYPRESS_ prefix
-      const reporterVariablesAsCypressVariables = Object.entries(
-        reporterVariables
-      )
-        .filter(([_, value]) => value !== undefined)
-        .map(([key, value]) => ({
-          name: "CYPRESS_" + key,
-          value: value.toString(),
-        }));
-      envVariablesWithValueToPassOnCommand =
-        envVariablesWithValueToPassOnCommand.concat(
-          reporterVariablesAsCypressVariables
-        );
-
+      const envVars = await getEcsEnvVariables();
       // Determine if there is a custom command
       let finalCommand;
       if (customCommand) {
@@ -102,7 +68,7 @@ async function executeEcs() {
             subnets,
             securityGroups,
             uploadToS3RoleArn,
-            envVariablesWithValueToPassOnCommand,
+            envVars,
             ecsPublicIp
           )
         );

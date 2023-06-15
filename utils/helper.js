@@ -117,7 +117,9 @@ async function getLatestFile(directory, filePrefix) {
     // Output the sorted items
     return sortedItems[0];
   } catch (err) {
-    console.error(err);
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
     return [];
   }
 }
@@ -143,7 +145,9 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
     }
     return responseArray;
   } catch (err) {
-    console.error(err);
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
     return [];
   }
 }
@@ -165,7 +169,9 @@ async function getTestPerState(directory, filePrefix, testState) {
     }
     return responseArray;
   } catch (err) {
-    console.error(err);
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
     return [];
   }
 }
@@ -181,7 +187,9 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
     }
     return responseArray;
   } catch (err) {
-    console.error(err);
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
     return [];
   }
 }
