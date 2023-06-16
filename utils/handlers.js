@@ -11,9 +11,8 @@ const {
   checkIfContainsTag,
   readConfigurationFIle,
   getRerun,
-  getLatestFile,
   getTestStatesPerId,
-  getTestPerStateFromFile,
+  getTestResultsFromAllFilesOnlyOnce,
 } = require("./helper");
 const { sendEventsToLambda } = require("./eventProcessor");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
@@ -51,24 +50,27 @@ async function handleResult(bucket) {
   try {
     let failedTestResults;
     let passedTestResults;
+    let allResultsOnce = [];
 
     if (getRerun()) {
       console.log("Retrieving rerun results...");
 
-      const testResultFileName = await getLatestFile(directory, "testResults-");
-      failedTestResults = await getTestPerStateFromFile(
+      // In case of rerun on ECS/local we have the following case
+      // Get all tests state from all the files in descending order from creation and make sure it only appears once
+      allResultsOnce = await getTestResultsFromAllFilesOnlyOnce(
         directory,
-        testResultFileName,
-        "failed"
+        "testResults-"
       );
-      passedTestResults = await getTestPerStateFromFile(
-        directory,
-        testResultFileName,
-        "passed"
+      failedTestResults = allResultsOnce.filter(
+        (testResult) => testResult.status === "failed"
+      );
+      passedTestResults = allResultsOnce.filter(
+        (testResult) => testResult.status === "passed"
       );
     } else {
       console.log("Retrieving results...");
 
+      // In case of no rerun just grab the resulsts from the local files
       failedTestResults = await getTestPerState(
         directory,
         "testResults-",
@@ -269,6 +271,7 @@ const parseArguments = async () => {
 };
 
 function determineFilePropertiesBasedOnTags(file, tag) {
+  const debug = require("debug")("TAGS");
   // If tag exists then determine based on the tags
   // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
   let unWipedScenarios;
@@ -282,6 +285,12 @@ function determineFilePropertiesBasedOnTags(file, tag) {
         fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
       }
     });
+    debug(
+      "Included and excluded tags per file",
+      tagsIncludedExcluded,
+      " -> ",
+      file
+    );
     let result = [];
     tagsIncludedExcluded.excludedTags.forEach((tag) => {
       result.push(checkIfAllWiped(file, tag));

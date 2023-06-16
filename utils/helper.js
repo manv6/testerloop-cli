@@ -96,15 +96,14 @@ const fse = require("fs-extra");
 const path = require("path");
 const { syncFilesFromS3 } = require("./s3");
 
-async function getLatestFile(directory, filePrefix) {
+async function getFilesSortedByMostRecent(directory, filePrefix) {
   try {
     const files = await fse.readdir(directory);
     const results = files.filter((file) => file.startsWith(filePrefix));
-
     // Extract and convert timestamps, then sort in ascending order
     var sortedTimestamps = results
       .map(function (result) {
-        var timestamp = result.replace("testResults-", "").replace(".json", "");
+        var timestamp = result.replace(filePrefix, "").replace(".json", "");
         return parseInt(timestamp, 10);
       })
       .sort(function (a, b) {
@@ -112,10 +111,38 @@ async function getLatestFile(directory, filePrefix) {
       });
     // Create a new array with sorted string items
     var sortedItems = sortedTimestamps.map(function (timestamp) {
-      return "testResults-" + timestamp + ".json";
+      return filePrefix + timestamp + ".json";
     });
     // Output the sorted items
-    return sortedItems[0];
+    return sortedItems;
+  } catch (err) {
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
+    return [];
+  }
+}
+
+async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
+  let responseArray = [];
+  let checkedTestIds = [];
+
+  try {
+    const files = await getFilesSortedByMostRecent(directory, filePrefix);
+    console.log("Sorted files: ", files);
+    for (const file of files) {
+      if (file.startsWith(filePrefix)) {
+        const json = await fse.readJSON(path.join(directory, file));
+        for (const contents of json) {
+          const testID = contents.testId;
+          if (!checkedTestIds.includes(testID)) {
+            responseArray.push(contents);
+            checkedTestIds.push(contents.testId);
+          }
+        }
+      }
+    }
+    return responseArray;
   } catch (err) {
     console.log(
       "!! No result files found for this execution. Check your s3 or reporter setup"
@@ -388,9 +415,10 @@ module.exports = {
   createFailedLinks,
   findArrayDifference,
   arraysHaveSameElements,
+  getTestResultsFromAllFilesOnlyOnce,
   setRerun,
   getRerun,
-  getLatestFile,
+  getFilesSortedByMostRecent,
   getTestPerStateFromFile,
   getECSRegion,
   getS3Region,
