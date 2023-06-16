@@ -1,4 +1,4 @@
-name: Slack Notification for new Cypress Reporter Version
+name: Slack Notification for new CLI Version
 
 on:
   workflow_run:
