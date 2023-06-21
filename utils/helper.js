@@ -151,6 +151,38 @@ async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
   }
 }
 
+async function getTestResultsFromAllFilesOnlyOnceByTestName(
+  directory,
+  filePrefix
+) {
+  let responseArray = [];
+  let checkedTestIds = [];
+
+  try {
+    const files = await getFilesSortedByMostRecent(directory, filePrefix);
+    for (const file of files) {
+      if (file.startsWith(filePrefix)) {
+        const json = await fse.readJSON(path.join(directory, file));
+        for (const contents of json) {
+          const title = contents.title;
+          const pathToTest = contents.pathToTest;
+          const key = pathToTest + " | " + title;
+          if (!checkedTestIds.includes(key)) {
+            responseArray.push(contents);
+            checkedTestIds.push(key);
+          }
+        }
+      }
+    }
+    return responseArray;
+  } catch (err) {
+    console.log(
+      "!! No result files found for this execution. Check your s3 or reporter setup"
+    );
+    return [];
+  }
+}
+
 async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
   let responseArray = [];
 
@@ -416,6 +448,7 @@ module.exports = {
   findArrayDifference,
   arraysHaveSameElements,
   getTestResultsFromAllFilesOnlyOnce,
+  getTestResultsFromAllFilesOnlyOnceByTestName,
   setRerun,
   getRerun,
   getFilesSortedByMostRecent,

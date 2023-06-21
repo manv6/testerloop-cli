@@ -13,6 +13,7 @@ const {
   getRerun,
   getTestStatesPerId,
   getTestResultsFromAllFilesOnlyOnce,
+  getTestResultsFromAllFilesOnlyOnceByTestName,
 } = require("./helper");
 const { sendEventsToLambda } = require("./eventProcessor");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
@@ -57,7 +58,7 @@ async function handleResult(bucket) {
 
       // In case of rerun on ECS/local we have the following case
       // Get all tests state from all the files in descending order from creation and make sure it only appears once
-      allResultsOnce = await getTestResultsFromAllFilesOnlyOnce(
+      allResultsOnce = await getTestResultsFromAllFilesOnlyOnceByTestName(
         directory,
         "testResults-"
       );
@@ -467,7 +468,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
 
     tempResults.forEach((result, index) => {
       console.log(
-        `-> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`
+        `--> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`
       );
 
       let test = {
