@@ -1,9 +1,8 @@
 const {
-  getInputData,
   getEnvVariableValuesFromCi,
   getEnvVariableWithValues,
 } = require("../handlers");
-const { getRunId } = require("../helper");
+const { getRunId, getInputData } = require("../helper");
 
 async function getLambdaEnvVariables() {
   const {

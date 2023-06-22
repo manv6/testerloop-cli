@@ -1,13 +1,12 @@
 const glob = require("glob");
 const {
   handleResult,
-  getInputData,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
 const { getEcsEnvVariables } = require("./envVariables/envVariablesHandler");
 const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
-
+const { getInputData } = require("./helper");
 async function executeEcs() {
   const {
     specFiles,

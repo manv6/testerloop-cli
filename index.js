@@ -3,12 +3,13 @@
 const colors = require("colors");
 colors.enable();
 const {
-  getInputData,
   getExecutionType,
-  setS3RunPath,
-  handleExecutionTypeInput,
+
   createAndUploadCICDFileToS3Bucket,
 } = require("./utils/handlers");
+const { handleExecutionTypeInput } = require("./utils/argumentsHandler");
+
+const { getInputData } = require("./utils/helper");
 
 const { executeEcs } = require("./utils/ecsExecutor");
 const { executeLocal } = require("./utils/localExecutor");
@@ -27,6 +28,7 @@ const {
   getLambdaRegion,
   getECSRegion,
   getOrgUrl,
+  setS3RunPath,
 } = require("./utils/helper");
 const { initializeS3Client } = require("./utils/s3");
 const { initializeLambdaClient } = require("./utils/eventProcessor");

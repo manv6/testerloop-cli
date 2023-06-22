@@ -1,3 +1,4 @@
+const debug = require("debug");
 const {
   getOrgUrl,
   setExitCode,
@@ -9,42 +10,40 @@ const {
   createRunLinks,
   createFailedLinks,
   checkIfContainsTag,
-  readConfigurationFIle,
   getRerun,
+  getS3RunPath,
+  getInputData,
   getTestStatesPerId,
-  getTestResultsFromAllFilesOnlyOnce,
   getTestResultsFromAllFilesOnlyOnceByTestName,
 } = require("./helper");
+
+const colors = require("colors");
+const { clearTheArgs } = require("./argumentsParser");
 const { sendEventsToLambda } = require("./eventProcessor");
 const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
-const arg = require("arg");
-let s3RunPath;
 const LCL = require("last-commit-log");
 
-function getS3RunPath() {
-  return s3RunPath;
-}
-function setS3RunPath(s3BucketName, customPath, runId) {
-  s3RunPath = (s3BucketName + "/" + customPath + "/" + runId)
-    .replaceAll("//", "/")
-    .replaceAll("//", "/");
-}
-
-const args = arg({}, { permissive: true });
 let executionType;
 
+const TAGS = {
+  s3: "s3",
+  throttling: "THROTTLING",
+  tags: "TAGS"
+}
+
 async function handleResult(bucket) {
-  const debug = require("debug")("s3");
+  const log = debug(TAGS.s3);
   // Grab the files from the s3 and store them locally to get results
   const directory = `./logs/testResults/${getS3RunPath().replace(
     bucket + "/",
     ""
   )}/results`;
+
   try {
     await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    debug("ERROR fetching results from s3", err);
+    log("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -71,18 +70,20 @@ async function handleResult(bucket) {
     } else {
       console.log("Retrieving results...");
 
-      // In case of no rerun just grab the resulsts from the local files
+      // In case of no rerun just grab the results from the local files
       failedTestResults = await getTestPerState(
         directory,
         "testResults-",
         "failed"
       );
+
       passedTestResults = await getTestPerState(
         directory,
         "testResults-",
         "passed"
       );
     }
+
     createRunLinks(getOrgUrl());
     if (failedTestResults.length > 0) {
       await createFailedLinks(failedTestResults, getOrgUrl());
@@ -94,13 +95,15 @@ async function handleResult(bucket) {
     console.log(
       "There was an error trying to parse your result files. Please check your s3 and reporter configuration "
     );
-    debug("ERROR parsing result files from local folder", err);
+    console.log("Error", err);
+    log("ERROR parsing result files from local folder", err);
   }
 
   process.exit(getExitCode());
 }
 
 async function getFailedLambdaTestResultsFromLocal(bucket) {
+  const log = debug(TAGS.s3);
   const directory = `./logs/testResults/${getS3RunPath().replace(
     bucket + "/",
     ""
@@ -109,7 +112,7 @@ async function getFailedLambdaTestResultsFromLocal(bucket) {
     await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    debug("ERROR fetching results from s3", err);
+    log("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -131,6 +134,7 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   bucket,
   listOfTestIdsToCheckResults
 ) {
+  const log = debug(TAGS.throttling);
   const directory = `./logs/testResults/${getS3RunPath().replace(
     bucket + "/",
     ""
@@ -139,7 +143,7 @@ async function getLambdaTestResultsFromLocalBasedOnId(
     await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    debug("ERROR fetching results from s3", err);
+    log("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -151,112 +155,6 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   return results;
 }
 
-async function getInputData() {
-  const cliArgs = await parseArguments();
-
-  // Load JSON data from .testerlooprc file
-  let configurationData = await readConfigurationFIle(".testerlooprc.json");
-
-  // Override JSON data with CLI arguments
-  let specFiles,
-    lambdaTimeOutSecs,
-    executionTypeInput,
-    executionTimeOutSecs,
-    tag,
-    customCommand,
-    lambdaThreads,
-    help,
-    rerun;
-
-  for (let i = 0; i < cliArgs.length; i++) {
-    switch (cliArgs[i]) {
-      case "--test-spec-folder":
-        specFiles = cliArgs[i + 1];
-        break;
-      case "--lambdaTimeoutInSeconds":
-        lambdaTimeOutSecs = cliArgs[i + 1];
-        break;
-      case "--executionTimeOutSecs":
-        executionTimeOutSecs = cliArgs[i + 1];
-        break;
-      case "--execute-on":
-        executionTypeInput = cliArgs[i + 1];
-        break;
-      case "--filter-by-tag":
-        tag = cliArgs[i + 1];
-        break;
-      case "--custom-command":
-        customCommand = cliArgs[i + 1];
-        break;
-      case "--lambda-threads":
-        lambdaThreads = cliArgs[i + 1];
-        break;
-      case "--help":
-      case "-h":
-        help = true;
-        break;
-      case "--rerun":
-        rerun = true;
-        break;
-      default:
-        break;
-    }
-  }
-  return {
-    specFiles: specFiles,
-    lambdaArn: configurationData.lambda?.lambdaArn,
-    testerLoopKeyId: configurationData.testerLoopKeyId,
-    executionTimeOutSecs: configurationData.executionTimeOutSecs || 1200,
-    tag: tag,
-    lambdaTimeOutSecs:
-      lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
-    lambdaThreads:
-      lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
-    executionTypeInput: executionTypeInput,
-    containerName: configurationData.ecs?.containerName,
-    clusterARN: configurationData.ecs?.clusterARN,
-    taskDefinition: configurationData.ecs?.taskDefinition,
-    subnets: configurationData.ecs?.subnets,
-    securityGroups: configurationData.ecs?.securityGroups,
-    uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
-    envVariablesECS: configurationData.ecs?.envVariables || [],
-    envVariablesLambda: configurationData.lambda?.envVariables || [],
-    envVariablesECSWithValues:
-      configurationData.ecs?.envVariablesWithValues || {},
-    envVariablesLambdaWithValues:
-      configurationData.lambda?.envVariablesWithValues || {},
-    uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
-    s3BucketName:
-      configurationData.reporter?.s3BucketName ||
-      "testerloop-default-bucket-name",
-    customPath: configurationData.reporter?.customPath || "",
-    reporterBaseUrl: configurationData?.reporterBaseUrl,
-    customCommand: customCommand || "",
-    help: help,
-    ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
-    rerun: rerun || false,
-    s3Region: configurationData.reporter?.region,
-    ecsRegion: configurationData.ecs?.region,
-    lambdaRegion: configurationData.lambda?.region,
-  };
-}
-
-async function handleExecutionTypeInput(input) {
-  switch (input) {
-    case "lambda":
-      setExecutionType("lambda");
-      break;
-    case "ecs":
-      setExecutionType("ecs");
-      break;
-    case "local-parallel":
-      setExecutionType("local-parallel");
-      break;
-    default:
-      setExecutionType("local");
-  }
-}
-
 function setExecutionType(input) {
   console.log(`LOG: Execution type has been set as: '${input}'`);
   executionType = input;
@@ -266,13 +164,8 @@ function getExecutionType() {
   return executionType;
 }
 
-const parseArguments = async () => {
-  const cliArgs = args._;
-  return cliArgs;
-};
-
 function determineFilePropertiesBasedOnTags(file, tag) {
-  const debug = require("debug")("TAGS");
+  const log = debug(TAGS.tags);
   // If tag exists then determine based on the tags
   // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
   let unWipedScenarios;
@@ -286,7 +179,7 @@ function determineFilePropertiesBasedOnTags(file, tag) {
         fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
       }
     });
-    debug(
+    log(
       "Included and excluded tags per file",
       tagsIncludedExcluded,
       " -> ",
@@ -305,23 +198,6 @@ function determineFilePropertiesBasedOnTags(file, tag) {
   }
 }
 
-async function clearTheArgs(argsToRemoveArray) {
-  return await parseArguments().then((cliArgs) => {
-    for (const argToRemove of argsToRemoveArray) {
-      const argIndex = cliArgs.indexOf(argToRemove.argName);
-
-      if (argIndex !== -1 && argIndex < cliArgs.length - 1) {
-        if (argToRemove.hasValue) {
-          cliArgs.splice(argIndex, 2);
-        } else {
-          cliArgs.splice(argIndex, 1);
-        }
-      }
-    }
-    return cliArgs;
-  });
-}
-
 async function createFinalCommand() {
   let argsToRemove = [
     { argName: "--execute-on", hasValue: true },
@@ -334,33 +210,41 @@ async function createFinalCommand() {
 }
 
 async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
-  const lcl = new LCL();
-  const commit = lcl.getLastCommitSync();
+  try {
+    const lcl = new LCL();
+    const commit = lcl.getLastCommitSync();
 
-  let env = clearValues({ ...process.env }, [
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-  ]);
+    let env = clearValues({ ...process.env }, [
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+    ]);
 
-  let additionalEnvsForLocalExecution = {
-    GITHUB_SERVER_URL: "local",
-    GITHUB_REF_NAME: "local",
-    GITHUB_REPOSITORY: "local",
-    GITHUB_REPOSITORY_OWNER: "local",
-  };
+    let additionalEnvsForLocalExecution = {
+      GITHUB_SERVER_URL: "local",
+      GITHUB_REF_NAME: "local",
+      GITHUB_REPOSITORY: "local",
+      GITHUB_REPOSITORY_OWNER: "local",
+    };
 
-  env = Object.keys(additionalEnvsForLocalExecution).reduce((acc, key) => {
-    if (!env.hasOwnProperty(key)) {
-      acc[key] = additionalEnvsForLocalExecution[key];
-    }
-    return acc;
-  }, env); // Check if each variable in additionalEnvsForLocalExecution is already in env
+    env = Object.keys(additionalEnvsForLocalExecution).reduce((acc, key) => {
+      if (!env.hasOwnProperty(key)) {
+        acc[key] = additionalEnvsForLocalExecution[key];
+      }
+      return acc;
+    }, env); // Check if each variable in additionalEnvsForLocalExecution is already in env
 
-  uploadFileToS3(
-    s3BucketName,
-    `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
-    JSON.stringify({ ...commit, ...env })
-  );
+    uploadFileToS3(
+      s3BucketName,
+      `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
+      JSON.stringify({ ...commit, ...env })
+    );
+  } catch (err) {
+    console.log("ERROR: Not able to upload the cicd.json file to s3.");
+    console.log(
+      "This can result in a breaking bebug page. Make sure your git repository is properly setup"
+    );
+    console.log("Error: ", err);
+  }
 }
 
 function getEnvVariableValuesFromCi(listOfVariables) {
@@ -375,6 +259,17 @@ function getEnvVariableValuesFromCi(listOfVariables) {
 }
 
 function getEnvVariableWithValues(jsonVariables) {
+  // Check if jsonVariables is an array
+  colors.enable();
+  if (Array.isArray(jsonVariables)) {
+    console.log(
+      colors.red(
+        "ERROR - 'envVariablesWithValues' in your testerlooprc.json is an array when it should be an object. \nThis can cause your tests to not work properly"
+      )
+    );
+    return [];
+  }
+
   const listOfVariablesWithValues = [];
   // Iterate over the object and extract the values
   for (var key in jsonVariables) {
@@ -397,8 +292,8 @@ async function handleExecutionTimeout(timeCounter) {
     console.log(
       colors.red(
         "Execution timed out after " +
-          executionTimeOutSecs +
-          " seconds. Results may vary"
+        executionTimeOutSecs +
+        " seconds. Results may vary"
       )
     );
     return true;
@@ -438,7 +333,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
   lambdaArn,
   envVariables
 ) {
-  const debug = require("debug")("THROTTLING");
+  const log = debug(TAGS.throttling);
   let listOfFilesToSend = [];
   let tempResults = [];
   let numberOfTestFilesSent = testsSentSoFar;
@@ -458,7 +353,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
         numberOfTestFilesSent++;
       }
     }
-    debug("List of files to be sent on this iteration: ", listOfFilesToSend);
+    log("List of files to be sent on this iteration: ", listOfFilesToSend);
 
     tempResults = await sendEventsToLambda(
       listOfFilesToSend,
@@ -487,16 +382,14 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
 }
 
 module.exports = {
+  TAGS,
   handleResult,
-  getInputData,
-  getS3RunPath,
-  setS3RunPath,
   getExecutionType,
+  setExecutionType,
   handleExecutionTimeout,
   removeTestFromList,
   checkLambdaHasTimedOut,
   createFinalCommand,
-  handleExecutionTypeInput,
   getEnvVariableValuesFromCi,
   createAndUploadCICDFileToS3Bucket,
   getLambdaTestResultsFromLocalBasedOnId,

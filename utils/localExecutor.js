@@ -1,10 +1,6 @@
-const { getRunId } = require("./helper");
+const { getRunId, getInputData } = require("./helper");
 const { spawn } = require("child_process");
-const {
-  handleResult,
-  createFinalCommand,
-  getInputData,
-} = require("./handlers");
+const { handleResult, createFinalCommand } = require("./handlers");
 
 async function executeLocal() {
   const { s3BucketName, customPath, uploadFilesToS3, s3Region } =

@@ -1,12 +1,30 @@
+const { parseArguments } = require("./argumentsParser");
 const { v4 } = require("uuid");
 const { readFileSync, readFile } = require("fs");
 
-let runId, orgURL, exitCode, rerun, s3Region, ecsRegion, lambdaRegion;
+let runId,
+  orgURL,
+  exitCode,
+  rerun,
+  s3Region,
+  ecsRegion,
+  lambdaRegion,
+  s3RunPath;
 
 function wait(ms = 5000) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function getS3RunPath() {
+  return s3RunPath;
+}
+
+function setS3RunPath(s3BucketName, customPath, runId) {
+  s3RunPath = (s3BucketName + "/" + customPath + "/" + runId)
+    .replaceAll("//", "/")
+    .replaceAll("//", "/");
 }
 
 function findArrayDifference(array1, array2) {
@@ -67,8 +85,12 @@ function setExitCode(code) {
   return (exitCode = code);
 }
 
-function setRunId() {
-  runId = v4();
+function setRunId(setRunId) {
+  if (setRunId) {
+    runId = setRunId;
+  } else {
+    runId = v4();
+  }
   return runId;
 }
 
@@ -87,6 +109,101 @@ function clearValues(object, keysArray = []) {
     delete object[element];
   });
   return object;
+}
+
+async function getInputData() {
+  const cliArgs = await parseArguments();
+
+  // Load JSON data from .testerlooprc file
+  let configurationData = await readConfigurationFIle(".testerlooprc.json");
+
+  // Override JSON data with CLI arguments
+  let specFiles,
+    lambdaTimeOutSecs,
+    executionTypeInput,
+    executionTimeOutSecs,
+    tag,
+    customCommand,
+    lambdaThreads,
+    showOnlyResultsForId,
+    help,
+    rerun;
+
+  for (let i = 0; i < cliArgs.length; i++) {
+    switch (cliArgs[i]) {
+      case "--show-results":
+        showOnlyResultsForId = cliArgs[i + 1];
+        break;
+      case "--test-spec-folder":
+        specFiles = cliArgs[i + 1];
+        break;
+      case "--lambdaTimeoutInSeconds":
+        lambdaTimeOutSecs = cliArgs[i + 1];
+        break;
+      case "--executionTimeOutSecs":
+        executionTimeOutSecs = cliArgs[i + 1];
+        break;
+      case "--execute-on":
+        executionTypeInput = cliArgs[i + 1];
+        break;
+      case "--filter-by-tag":
+        tag = cliArgs[i + 1];
+        break;
+      case "--custom-command":
+        customCommand = cliArgs[i + 1];
+        break;
+      case "--lambda-threads":
+        lambdaThreads = cliArgs[i + 1];
+        break;
+      case "--help":
+      case "-h":
+        help = true;
+        break;
+      case "--rerun":
+        rerun = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return {
+    specFiles: specFiles,
+    lambdaArn: configurationData.lambda?.lambdaArn,
+    testerLoopKeyId: configurationData.testerLoopKeyId,
+    executionTimeOutSecs: configurationData.executionTimeOutSecs || 1200,
+    tag: tag,
+    lambdaTimeOutSecs:
+      lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
+    lambdaThreads:
+      lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
+    executionTypeInput: executionTypeInput,
+    containerName: configurationData.ecs?.containerName,
+    clusterARN: configurationData.ecs?.clusterARN,
+    taskDefinition: configurationData.ecs?.taskDefinition,
+    subnets: configurationData.ecs?.subnets,
+    securityGroups: configurationData.ecs?.securityGroups,
+    uploadToS3RoleArn: configurationData.ecs?.uploadToS3RoleArn,
+    envVariablesECS: configurationData.ecs?.envVariables || [],
+    envVariablesLambda: configurationData.lambda?.envVariables || [],
+    envVariablesECSWithValues:
+      configurationData.ecs?.envVariablesWithValues || {},
+    envVariablesLambdaWithValues:
+      configurationData.lambda?.envVariablesWithValues || {},
+    uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
+    s3BucketName:
+      configurationData.reporter?.s3BucketName ||
+      "testerloop-default-bucket-name",
+    customPath: configurationData.reporter?.customPath || "",
+    reporterBaseUrl: configurationData?.reporterBaseUrl,
+    customCommand: customCommand || "",
+    help: help,
+    ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
+    rerun: rerun || false,
+    s3Region: configurationData.reporter?.region,
+    ecsRegion: configurationData.ecs?.region,
+    lambdaRegion: configurationData.lambda?.region,
+    showOnlyResultsForId: showOnlyResultsForId || false,
+  };
 }
 
 function clearFeaturePath(featureFile) {
@@ -129,7 +246,6 @@ async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
 
   try {
     const files = await getFilesSortedByMostRecent(directory, filePrefix);
-    console.log("Sorted files: ", files);
     for (const file of files) {
       if (file.startsWith(filePrefix)) {
         const json = await fse.readJSON(path.join(directory, file));
@@ -339,10 +455,6 @@ async function readConfigurationFIle(file) {
   });
 }
 
-function cleanInput(str) {
-  return str.split(",").map((str) => str.trim());
-}
-
 function showHelp() {
   const colors = require("colors");
 
@@ -428,7 +540,6 @@ module.exports = {
   getRunId,
   getOrgUrl,
   setOrgUrl,
-  cleanInput,
   getExitCode,
   setExitCode,
   checkIfContainsTag,
@@ -451,6 +562,8 @@ module.exports = {
   getTestResultsFromAllFilesOnlyOnceByTestName,
   setRerun,
   getRerun,
+  setS3RunPath,
+  getS3RunPath,
   getFilesSortedByMostRecent,
   getTestPerStateFromFile,
   getECSRegion,
@@ -459,4 +572,7 @@ module.exports = {
   setECSRegion,
   setS3Region,
   setLambdaRegion,
+  getInputData,
+  extractTags,
+  getNonCommonElements,
 };

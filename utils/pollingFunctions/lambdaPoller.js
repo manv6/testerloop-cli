@@ -1,7 +1,5 @@
-const { wait, line, setExitCode } = require("../helper");
+const { wait, line, getInputData, getS3RunPath } = require("../helper");
 const {
-  getS3RunPath,
-  getInputData,
   removeTestFromList,
   handleExecutionTimeout,
   checkLambdaHasTimedOut,

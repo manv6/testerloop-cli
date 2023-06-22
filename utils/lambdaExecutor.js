@@ -6,12 +6,12 @@ const {
   setExitCode,
   getExitCode,
   line,
+  getInputData
 } = require("./helper");
 const glob = require("glob");
 
 const {
   handleResult,
-  getInputData,
   getFailedLambdaTestResultsFromLocal,
   getLambdaTestResultsFromLocalBasedOnId,
 } = require("./handlers");
