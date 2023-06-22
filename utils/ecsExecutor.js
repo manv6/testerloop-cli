@@ -51,7 +51,7 @@ async function executeEcs() {
           .replace(/%TEST_FILENAME\b/g, file.split("/").pop())}`.split(" ");
       } else {
         finalCommand =
-          `timeout 2400 npx cypress run --browser chrome --spec ${file} --env TAGS=${tag}`.split(
+          `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
             " "
           );
       }
