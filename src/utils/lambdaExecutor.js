@@ -1,14 +1,11 @@
 const {
-  getRerun,
-  getOrgUrl,
   createRunLinks,
   createFailedLinks,
   setExitCode,
   getExitCode,
   line,
-  getInputData
+  getInputData,
 } = require("./helper");
-const glob = require("glob");
 
 const {
   handleResult,
@@ -21,15 +18,15 @@ const {
 const { filterFeatureFilesByTag } = require("./filterFunctions/lambdaFilter");
 const colors = require("colors");
 const {
-  pollLambdas,
   pollLambdasWithThrottling,
 } = require("./pollingFunctions/lambdaPoller");
 const { getLambdaEnvVariables } = require("./envVariables/envVariablesHandler");
 colors.enable();
 
-async function executeLambdas() {
+async function executeLambdas(runId, s3RunPath) {
   const debug = require("debug")("THROTTLING");
-  const { specFiles, s3BucketName, tag } = await getInputData();
+  const { specFiles, s3BucketName, tag, rerun, reporterBaseUrl } =
+    await getInputData();
 
   // Get the sliced files based on the provided path and filter them by tag
   const slicedFiles = await sliceFeatureFilesRecursively(specFiles);
@@ -37,11 +34,12 @@ async function executeLambdas() {
     slicedFiles,
     tag
   );
-  const envVars = await getLambdaEnvVariables();
+  const envVars = await getLambdaEnvVariables(runId);
 
   const { listOfLambdasWhichTimedOut } = await pollLambdasWithThrottling(
     finalFilesToSendToLambda,
-    envVars
+    envVars,
+    s3RunPath
   );
   console.log("RUN FINISHED");
 
@@ -55,13 +53,14 @@ async function executeLambdas() {
   line();
   // Get the failed tests results from local
   const listOfFailedLambdaTests = await getFailedLambdaTestResultsFromLocal(
-    s3BucketName
+    s3BucketName,
+    s3RunPath
   );
 
   if (
     (listOfLambdasWhichTimedOut.length > 0 ||
       listOfFailedLambdaTests.length > 0) &&
-    getRerun()
+    rerun
   ) {
     let listOfFilesToRerun = [];
     for (const test of listOfLambdasWhichTimedOut) {
@@ -83,12 +82,13 @@ async function executeLambdas() {
     const {
       allIdsMapped: requestIdsToCheckForRerun,
       listOfLambdasWhichTimedOut: rerunTimedOutLambdasList,
-    } = await pollLambdasWithThrottling(listOfFilesToRerun, envVars);
+    } = await pollLambdasWithThrottling(listOfFilesToRerun, envVars, s3RunPath);
     console.log("RUN FINISHED");
     line();
     const rerunTestResults = await getLambdaTestResultsFromLocalBasedOnId(
       s3BucketName,
-      requestIdsToCheckForRerun
+      requestIdsToCheckForRerun,
+      s3RunPath
     );
     const failedTestResults = rerunTestResults.filter(
       (testResult) => testResult.status === "failed"
@@ -101,16 +101,16 @@ async function executeLambdas() {
       );
     }
 
-    createRunLinks(getOrgUrl());
+    await createRunLinks(reporterBaseUrl, runId);
     if (failedTestResults.length > 0) {
-      await createFailedLinks(failedTestResults, getOrgUrl());
+      await createFailedLinks(runId, failedTestResults, reporterBaseUrl);
       setExitCode(1);
     } else {
       setExitCode(0);
     }
     process.exit(getExitCode());
   } else {
-    await handleResult(s3BucketName);
+    await handleResult(s3BucketName, s3RunPath, runId);
   }
 }
 

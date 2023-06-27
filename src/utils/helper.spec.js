@@ -1,23 +1,18 @@
 const fse = require("fs-extra");
 const fs = require("fs");
 const assert = require("assert");
-const util = require("util");
-const readFile = util.promisify(fs.readFile);
 const {
   getTestPerState,
   getTestStatesPerId,
   getTestResultsFromAllFilesOnlyOnce,
   getFilesSortedByMostRecent,
   createFailedLinks,
-  setOrgUrl,
-  getOrgUrl,
   extractTags,
   checkIfContainsTag,
   getNonCommonElements,
   checkIfAllWiped,
   readConfigurationFIle,
 } = require("./helper");
-const helper = require("./helper");
 const path = require("path");
 
 describe.skip("helper", () => {
@@ -381,14 +376,6 @@ describe.skip("helper", () => {
         `Test failed: ${failedTests[1].title} `,
         `${orgURL}/run/${runId}/test/${failedTests[1].testId}`
       );
-    });
-  });
-
-  describe("setOrgUrl - getOrgUrl", () => {
-    test("remove trailing slash from orgUrl", () => {
-      const orgUrl = "https://example.com/";
-      setOrgUrl(orgUrl);
-      expect(getOrgUrl()).toBe("https://example.com");
     });
   });
 

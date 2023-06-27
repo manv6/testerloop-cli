@@ -7,7 +7,7 @@ const { getEcsEnvVariables } = require("./envVariables/envVariablesHandler");
 const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
 const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
 const { getInputData } = require("./helper");
-async function executeEcs() {
+async function executeEcs(runId, s3RunPath) {
   const {
     specFiles,
     tag,
@@ -18,7 +18,6 @@ async function executeEcs() {
     securityGroups,
     uploadToS3RoleArn,
     s3BucketName,
-    customPath,
     customCommand,
     ecsPublicIp,
   } = await getInputData();
@@ -41,7 +40,7 @@ async function executeEcs() {
       const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
         determineFilePropertiesBasedOnTags(file, tag);
 
-      const envVars = await getEcsEnvVariables();
+      const envVars = await getEcsEnvVariables(runId);
       // Determine if there is a custom command
       let finalCommand;
       if (customCommand) {
@@ -128,14 +127,13 @@ async function executeEcs() {
     for (let i = 0; i < taskDetails.length; i++) {
       console.log("\n");
       console.log(
-        `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${
-          taskDetails[i].arn
+        `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${taskDetails[i].arn
         }`
       );
     }
   }
   if (tasks.length > 0) {
-    await handleResult(s3BucketName, customPath);
+    await handleResult(s3BucketName, s3RunPath, runId);
   }
 }
 

@@ -29,9 +29,6 @@ jest.mock("debug", () => jest.fn(() => jest.fn()));
 
 jest.mock("./helper", () => ({
   getTestPerState: jest.fn(),
-  getRerun: jest.fn(),
-  getS3RunPath: jest.fn(),
-  getOrgUrl: jest.fn(),
   createRunLinks: jest.fn(),
   createFailedLinks: jest.fn(),
   setExitCode: jest.fn(),
@@ -60,15 +57,10 @@ describe("handlers", () => {
     });
 
     test("should handle results for rerun and process exit code with failed tests", async () => {
-      // To enable rerun mock the getRerunMock method to true
-      const getRerunMock = jest.spyOn(helper, "getRerun").mockReturnValue(true);
-      const getS3RunPathMock = jest
-        .spyOn(helper, "getS3RunPath")
-        .mockReturnValue(s3RunPath);
-
-      const getOrgUrlMock = jest
-        .spyOn(helper, "getOrgUrl")
-        .mockReturnValue(orgUrl);
+      helper.getInputData.mockReturnValue({
+        reporterBaseUrl: orgUrl,
+        rerun: true,
+      });
       const expectedExitCode = 1;
 
       const getTestPerStateMock = jest.fn().mockResolvedValue([
@@ -101,17 +93,14 @@ describe("handlers", () => {
         .spyOn(process, "exit")
         .mockImplementation(() => { });
 
-      await handleResult(bucketName);
+      await handleResult(bucketName, s3RunPath, runId);
 
-      expect(getRerunMock).toHaveBeenCalled();
-      expect(getOrgUrlMock).toHaveBeenCalled();
+      expect(helper.getInputData).toHaveBeenCalled();
 
       expect(s3.syncFilesFromS3).toHaveBeenCalledWith(
         `s3://${s3RunPath}/results`,
         "logs/testResults"
       );
-
-      expect(getS3RunPathMock).toHaveBeenCalled();
 
       expect(
         helper.getTestResultsFromAllFilesOnlyOnceByTestName
@@ -120,6 +109,7 @@ describe("handlers", () => {
 
       expect(helper.createRunLinks).toHaveBeenCalled();
       expect(helper.createFailedLinks).toHaveBeenCalledWith(
+        runId,
         failedTestResults,
         orgUrl
       );
@@ -129,15 +119,10 @@ describe("handlers", () => {
     });
 
     test("should handle results for rerun and process exit code with passed tests", async () => {
-      // To enable rerun mock the getRerunMock method to true
-      const getRerunMock = jest.spyOn(helper, "getRerun").mockReturnValue(true);
-      const getS3RunPathMock = jest
-        .spyOn(helper, "getS3RunPath")
-        .mockReturnValue(s3RunPath);
-
-      const getOrgUrlMock = jest
-        .spyOn(helper, "getOrgUrl")
-        .mockReturnValue(orgUrl);
+      helper.getInputData.mockReturnValue({
+        reporterBaseUrl: orgUrl,
+        rerun: true,
+      });
       const expectedExitCode = 0;
       const syncFilesFromS3Mock = jest.fn().mockResolvedValue([]);
       const failedTestResults = [];
@@ -168,17 +153,14 @@ describe("handlers", () => {
         .spyOn(process, "exit")
         .mockImplementation(() => { });
 
-      await handleResult(bucketName);
+      await handleResult(bucketName, s3RunPath, runId);
 
-      expect(getRerunMock).toHaveBeenCalled();
-      expect(getOrgUrlMock).toHaveBeenCalled();
+      expect(helper.getInputData).toHaveBeenCalled();
 
       expect(syncFilesFromS3Mock).toHaveBeenCalledWith(
         `s3://${s3RunPath}/results`,
         "logs/testResults"
       );
-
-      expect(getS3RunPathMock).toHaveBeenCalled();
 
       expect(
         helper.getTestResultsFromAllFilesOnlyOnceByTestName
@@ -207,32 +189,28 @@ describe("handlers", () => {
         .mockResolvedValue(`${orgUrl}/${runId}`);
 
       jest.spyOn(helper, "createFailedLinks").mockResolvedValue([]);
-      jest.spyOn(helper, "getS3RunPath").mockReturnValue(s3RunPath);
-      const getOrgUrlMock = jest
-        .spyOn(helper, "getOrgUrl")
-        .mockReturnValue(orgUrl);
+      helper.getInputData.mockReturnValue({
+        reporterBaseUrl: orgUrl,
+        rerun: false,
+      });
 
       jest.spyOn(helper, "getExitCode").mockReturnValue(expectedExitCode);
       jest.spyOn(helper, "setExitCode").mockReturnValue(expectedExitCode);
       jest.spyOn(s3, "syncFilesFromS3").mockResolvedValue([]);
-      helper.getRerun.mockReturnValue(false);
       helper.getTestPerState.mockResolvedValueOnce(failedTestResults);
 
       const processExitSpy = jest
         .spyOn(process, "exit")
         .mockImplementation(() => { });
 
-      await handleResult(bucketName);
+      await handleResult(bucketName, s3RunPath, runId);
 
-      expect(helper.getRerun).toHaveBeenCalled();
-      expect(getOrgUrlMock).toHaveBeenCalled();
+      expect(helper.getInputData).toHaveBeenCalled();
 
       expect(s3.syncFilesFromS3).toHaveBeenCalledWith(
         `s3://${s3RunPath}/results`,
         "logs/testResults"
       );
-
-      expect(helper.getS3RunPath).toHaveBeenCalled();
 
       expect(helper.getTestPerState).toHaveBeenCalled();
       expect(helper.getTestPerState).toHaveBeenCalledWith(
@@ -243,6 +221,7 @@ describe("handlers", () => {
 
       expect(helper.createRunLinks).toHaveBeenCalled();
       expect(helper.createFailedLinks).toHaveBeenCalledWith(
+        runId,
         failedTestResults,
         orgUrl
       );
@@ -267,15 +246,14 @@ describe("handlers", () => {
         .mockResolvedValue(`${orgUrl}/${runId}`);
 
       jest.spyOn(helper, "createFailedLinks").mockResolvedValue([]);
-      jest.spyOn(helper, "getS3RunPath").mockReturnValue(s3RunPath);
-      const getOrgUrlMock = jest
-        .spyOn(helper, "getOrgUrl")
-        .mockReturnValue(orgUrl);
+      helper.getInputData.mockReturnValue({
+        reporterBaseUrl: orgUrl,
+        rerun: false,
+      });
 
       jest.spyOn(helper, "getExitCode").mockReturnValue(expectedExitCode);
       jest.spyOn(helper, "setExitCode").mockReturnValue(expectedExitCode);
       jest.spyOn(s3, "syncFilesFromS3").mockResolvedValue([]);
-      helper.getRerun.mockReturnValue(false);
       helper.getTestPerState
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(passedTestResults);
@@ -284,17 +262,14 @@ describe("handlers", () => {
         .spyOn(process, "exit")
         .mockImplementation(() => { });
 
-      await handleResult(bucketName);
+      await handleResult(bucketName, s3RunPath, runId);
 
-      expect(helper.getRerun).toHaveBeenCalled();
-      expect(getOrgUrlMock).toHaveBeenCalled();
+      expect(helper.getInputData).toHaveBeenCalled();
 
       expect(s3.syncFilesFromS3).toHaveBeenCalledWith(
         `s3://${s3RunPath}/results`,
         "logs/testResults"
       );
-
-      expect(helper.getS3RunPath).toHaveBeenCalled();
 
       expect(helper.getTestPerState).toHaveBeenCalled();
       expect(helper.getTestPerState).toHaveBeenCalledWith(
@@ -609,11 +584,11 @@ describe("handlers", () => {
       const bucket = "your-bucket-name";
       const listOfTestIdsToCheckResults = ["test-id-1", "test-id-2"];
       const expectedResults = [];
-      helper.getS3RunPath.mockReturnValue(s3RunPath);
       helper.getTestStatesPerId.mockResolvedValueOnce([]);
       const results = await getLambdaTestResultsFromLocalBasedOnId(
         bucket,
-        listOfTestIdsToCheckResults
+        listOfTestIdsToCheckResults,
+        s3RunPath
       );
 
       expect(results).toEqual(expectedResults);
@@ -626,14 +601,14 @@ describe("handlers", () => {
         { testId: "test-id-1", data: "test1" },
         { testId: "test-id-2", data: "test2" },
       ];
-      helper.getS3RunPath.mockReturnValue(s3RunPath);
       helper.getTestStatesPerId.mockResolvedValue([
         { testId: "test-id-1", data: "test1" },
         { testId: "test-id-2", data: "test2" },
       ]);
       const results = await getLambdaTestResultsFromLocalBasedOnId(
         bucket,
-        listOfTestIdsToCheckResults
+        listOfTestIdsToCheckResults,
+        s3RunPath
       );
 
       expect(results).toEqual(expectedResults);
@@ -648,7 +623,6 @@ describe("handlers", () => {
       const listOfTestIdsToCheckResults = ["test-id-1", "test-id-2"];
       const log = jest.fn();
       debug.mockReturnValue(log);
-      helper.getS3RunPath.mockReturnValue(s3RunPath);
       s3.syncFilesFromS3.mockImplementation(() => {
         throw new Error("Failed to fetch data from s3");
       });
@@ -659,7 +633,8 @@ describe("handlers", () => {
 
       await getLambdaTestResultsFromLocalBasedOnId(
         bucket,
-        listOfTestIdsToCheckResults
+        listOfTestIdsToCheckResults,
+        s3RunPath
       );
 
       expect(debug).toHaveBeenCalledWith(TAGS.throttling);
@@ -697,7 +672,10 @@ describe("handlers", () => {
       // jest.spyOn(global, "syncFilesFromS3").mockImplementation(() => {});
       helper.getTestPerState.mockResolvedValueOnce(failedTestResults);
 
-      const result = await getFailedLambdaTestResultsFromLocal(bucketName);
+      const result = await getFailedLambdaTestResultsFromLocal(
+        bucketName,
+        s3RunPath
+      );
 
       expect(result).toEqual(["failing_test1.js", "failing_test2.js"]);
       expect(helper.setExitCode).not.toHaveBeenCalled();
@@ -711,13 +689,12 @@ describe("handlers", () => {
       const bucketName = "bucketName";
 
       helper.getTestPerState.mockResolvedValueOnce([]);
-      helper.getS3RunPath.mockReturnValue(s3RunPath);
       jest.spyOn(console, "log").mockImplementation(() => { });
       s3.syncFilesFromS3.mockRejectedValueOnce(
         new Error("Unable to fetch results")
       );
 
-      await getFailedLambdaTestResultsFromLocal(bucketName);
+      await getFailedLambdaTestResultsFromLocal(bucketName, s3RunPath);
 
       expect(helper.setExitCode).toHaveBeenCalledWith(1);
       expect(console.log).toHaveBeenCalledWith(

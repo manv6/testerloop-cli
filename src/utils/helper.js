@@ -2,14 +2,7 @@ const { parseArguments } = require("./argumentsParser");
 const { v4 } = require("uuid");
 const { readFileSync, readFile } = require("fs");
 
-let runId,
-  orgURL,
-  exitCode,
-  rerun,
-  s3Region,
-  ecsRegion,
-  lambdaRegion,
-  s3RunPath;
+let exitCode;
 
 function wait(ms = 5000) {
   return new Promise((resolve) => {
@@ -17,12 +10,8 @@ function wait(ms = 5000) {
   });
 }
 
-function getS3RunPath() {
-  return s3RunPath;
-}
-
-function setS3RunPath(s3BucketName, customPath, runId) {
-  s3RunPath = (s3BucketName + "/" + customPath + "/" + runId)
+function getS3RunPath(s3BucketName, customPath, runId) {
+  return (s3BucketName + "/" + customPath + "/" + runId)
     .replaceAll("//", "/")
     .replaceAll("//", "/");
 }
@@ -46,35 +35,8 @@ async function arraysHaveSameElements(id, res) {
   });
 }
 
-function getRunId() {
-  return runId;
-}
-async function setS3Region(region) {
-  s3Region = region;
-}
-
-function getS3Region() {
-  return s3Region;
-}
-
-function getECSRegion() {
-  return ecsRegion;
-}
-
-async function setECSRegion(region) {
-  ecsRegion = region;
-}
-
-function getLambdaRegion() {
-  return lambdaRegion;
-}
-
-async function setLambdaRegion(region) {
-  lambdaRegion = region;
-}
-
-function getOrgUrl() {
-  return orgURL;
+function getNewRunId() {
+  return v4();
 }
 
 function getExitCode() {
@@ -85,17 +47,8 @@ function setExitCode(code) {
   return (exitCode = code);
 }
 
-function setRunId(setRunId) {
-  if (setRunId) {
-    runId = setRunId;
-  } else {
-    runId = v4();
-  }
-  return runId;
-}
-
-function setOrgUrl(orgUrl) {
-  orgURL = orgUrl.endsWith("/") ? orgUrl.slice(0, -1) : orgUrl;
+function getOrgUrl(orgUrl) {
+  return orgUrl.endsWith("/") ? orgUrl.slice(0, -1) : orgUrl;
 }
 
 function line() {
@@ -121,7 +74,6 @@ async function getInputData() {
   let specFiles,
     lambdaTimeOutSecs,
     executionTypeInput,
-    executionTimeOutSecs,
     tag,
     customCommand,
     lambdaThreads,
@@ -194,7 +146,7 @@ async function getInputData() {
       configurationData.reporter?.s3BucketName ||
       "testerloop-default-bucket-name",
     customPath: configurationData.reporter?.customPath || "",
-    reporterBaseUrl: configurationData?.reporterBaseUrl,
+    reporterBaseUrl: getOrgUrl(configurationData?.reporterBaseUrl),
     customCommand: customCommand || "",
     help: help,
     ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
@@ -219,15 +171,15 @@ async function getFilesSortedByMostRecent(directory, filePrefix) {
     const results = files.filter((file) => file.startsWith(filePrefix));
     // Extract and convert timestamps, then sort in ascending order
     var sortedTimestamps = results
-      .map(function (result) {
+      .map(function(result) {
         var timestamp = result.replace(filePrefix, "").replace(".json", "");
         return parseInt(timestamp, 10);
       })
-      .sort(function (a, b) {
+      .sort(function(a, b) {
         return b - a;
       });
     // Create a new array with sorted string items
-    var sortedItems = sortedTimestamps.map(function (timestamp) {
+    var sortedItems = sortedTimestamps.map(function(timestamp) {
       return filePrefix + timestamp + ".json";
     });
     // Output the sorted items
@@ -369,19 +321,19 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
   }
 }
 
-async function createFailedLinks(failedTests, orgURL) {
+async function createFailedLinks(runId, failedTests, orgURL) {
   const colors = require("colors");
   colors.enable();
   for (const failed of failedTests) {
-    const failedUrl = `${orgURL}/run/${getRunId()}/test/${failed.testId}`;
+    const failedUrl = `${orgURL}/run/${runId}/test/${failed.testId}`;
     console.log(`Test failed: ${failed.title} `, failedUrl);
   }
   line();
 }
 
-async function createRunLinks(orgURL) {
+async function createRunLinks(orgURL, runId) {
   line();
-  console.log(`Testerloop run URL: ${orgURL}/run/${getRunId()}`);
+  console.log(`Testerloop run URL: ${orgURL}/run/${runId}`);
   line();
 }
 
@@ -444,7 +396,7 @@ function checkIfAllWiped(filename, tag) {
 }
 
 async function readConfigurationFIle(file) {
-  return new Promise(function (resolve, reject) {
+  return new Promise(function(resolve, reject) {
     readFile(file, "utf-8", (err, data) => {
       if (err) {
         console.error(`Error reading ${file} file 1: ${err}`);
@@ -460,7 +412,7 @@ function showHelp() {
 
   console.log(
     colors.grey("[rerun]") +
-      ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome'
+    ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome'
   );
   console.log(
     "\t \t  --rerun: defines if there is a rerun mechanism for cypress"
@@ -472,22 +424,22 @@ function showHelp() {
   );
   console.log(
     colors.blue("[local]") +
-      " Example: npx tl cypress run --spec e2e/login.feature --browser chrome --headless"
+    " Example: npx tl cypress run --spec e2e/login.feature --browser chrome --headless"
   );
   console.log(colors.blue("[local]") + " Params : Any cypress parameters");
   console.log("\n");
 
   console.log(
     colors.magenta("[lambda]") +
-      " Usage  : npx tl --execute-on ecs ...ecs_options "
+    " Usage  : npx tl --execute-on ecs ...ecs_options "
   );
   console.log(
     colors.magenta("[lambda]") +
-      " Example: npx tl --execute-on lambda --spec e2e/login.feature --tag @mytag"
+    " Example: npx tl --execute-on lambda --spec e2e/login.feature --tag @mytag"
   );
   console.log(
     colors.magenta("[lambda]") +
-      " Params : Lambda execution accepts the following:"
+    " Params : Lambda execution accepts the following:"
   );
   console.log("\t \t  --execute-on: defines where to execute the tests");
   console.log(
@@ -504,7 +456,7 @@ function showHelp() {
   );
   console.log(
     colors.yellow("[ecs]") +
-      " Example: npx tl --execute-on ecs --spec e2e/login.feature --tag @mytag"
+    " Example: npx tl --execute-on ecs --spec e2e/login.feature --tag @mytag"
   );
   console.log(
     colors.yellow("[ecs]") + " Params : Ecs execution accepts the following:"
@@ -527,19 +479,8 @@ function showHelp() {
   );
 }
 
-function setRerun(rerunInput) {
-  rerun = rerunInput;
-}
-
-function getRerun() {
-  return rerun;
-}
-
 module.exports = {
-  setRunId,
-  getRunId,
-  getOrgUrl,
-  setOrgUrl,
+  getNewRunId,
   getExitCode,
   setExitCode,
   checkIfContainsTag,
@@ -560,18 +501,9 @@ module.exports = {
   arraysHaveSameElements,
   getTestResultsFromAllFilesOnlyOnce,
   getTestResultsFromAllFilesOnlyOnceByTestName,
-  setRerun,
-  getRerun,
-  setS3RunPath,
   getS3RunPath,
   getFilesSortedByMostRecent,
   getTestPerStateFromFile,
-  getECSRegion,
-  getS3Region,
-  getLambdaRegion,
-  setECSRegion,
-  setS3Region,
-  setLambdaRegion,
   getInputData,
   extractTags,
   getNonCommonElements,

@@ -2,7 +2,7 @@ const {
   getEnvVariableWithValues,
   getEnvVariableValuesFromCi,
 } = require("../../utils/handlers");
-const { getRunId, getInputData } = require("../../utils/helper");
+const { getInputData } = require("../../utils/helper");
 const {
   getLambdaEnvVariables,
   getEcsEnvVariables,
@@ -30,10 +30,10 @@ describe("getLambdaEnvVariables", () => {
       uploadFilesToS3: true,
       s3Region: "us-west-2",
     };
-    const mockedRunId = "12345";
+    const runId = "12345";
 
     const expectedVariables = {
-      CYPRESS_TL_RUN_ID: mockedRunId,
+      CYPRESS_TL_RUN_ID: runId,
       CYPRESS_TL_TEST_ID: undefined,
       CYPRESS_TL_S3_BUCKET_NAME: mockedInputData.s3BucketName,
       CYPRESS_TL_EXECUTE_FROM: "lambda",
@@ -45,7 +45,6 @@ describe("getLambdaEnvVariables", () => {
       VAR_THREE: "value3",
     };
     getInputData.mockResolvedValue(mockedInputData);
-    getRunId.mockReturnValue(mockedRunId);
 
     getEnvVariableWithValues.mockReturnValue(envVariablesLambdaWithValues);
     getEnvVariableValuesFromCi.mockReturnValue(
@@ -53,7 +52,7 @@ describe("getLambdaEnvVariables", () => {
     );
 
     // Act
-    const result = await getLambdaEnvVariables();
+    const result = await getLambdaEnvVariables(runId);
 
     // Assert
     expect(result).toEqual(expectedVariables);
@@ -78,13 +77,13 @@ describe("getEcsEnvVariables", () => {
       uploadFilesToS3: true,
       s3Region: "us-west-2",
     };
-    const mockedRunId = "12345";
+    const runId = "12345";
 
     const expectedVariables = [
       { name: "VAR_ONE", value: "value1" },
       { name: "VAR_TWO", value: "value2" },
       { name: "VAR_THREE", value: "value3" },
-      { name: "CYPRESS_TL_RUN_ID", value: mockedRunId },
+      { name: "CYPRESS_TL_RUN_ID", value: runId },
       {
         name: "CYPRESS_TL_S3_BUCKET_NAME",
         value: mockedInputData.s3BucketName,
@@ -102,7 +101,6 @@ describe("getEcsEnvVariables", () => {
     ];
 
     getInputData.mockResolvedValue(mockedInputData);
-    getRunId.mockReturnValue(mockedRunId);
 
     getEnvVariableWithValues.mockReturnValue(envVariablesEcsWithValues);
     getEnvVariableValuesFromCi.mockReturnValue(
@@ -110,7 +108,7 @@ describe("getEcsEnvVariables", () => {
     );
 
     // Act
-    const result = await getEcsEnvVariables();
+    const result = await getEcsEnvVariables(runId);
 
     // Assert
     expect(result).toEqual(expectedVariables);

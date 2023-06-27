@@ -2,9 +2,9 @@ const {
   getEnvVariableValuesFromCi,
   getEnvVariableWithValues,
 } = require("../handlers");
-const { getRunId, getInputData } = require("../helper");
+const { getInputData } = require("../helper");
 
-async function getLambdaEnvVariables() {
+async function getLambdaEnvVariables(runId) {
   const {
     envVariablesLambda,
     envVariablesLambdaWithValues,
@@ -15,7 +15,7 @@ async function getLambdaEnvVariables() {
   } = await getInputData();
 
   const reporterBaseVariables = {
-    CYPRESS_TL_RUN_ID: getRunId(),
+    CYPRESS_TL_RUN_ID: runId,
     CYPRESS_TL_TEST_ID: undefined,
     CYPRESS_TL_S3_BUCKET_NAME: s3BucketName,
     CYPRESS_TL_EXECUTE_FROM: "local",
@@ -40,7 +40,7 @@ async function getLambdaEnvVariables() {
   return envVars;
 }
 
-async function getEcsEnvVariables() {
+async function getEcsEnvVariables(runId) {
   const {
     envVariablesECS,
     envVariablesECSWithValues,
@@ -56,7 +56,7 @@ async function getEcsEnvVariables() {
   ];
 
   const reporterBaseVariables = {
-    TL_RUN_ID: getRunId(),
+    TL_RUN_ID: runId,
     TL_TEST_ID: undefined,
     TL_S3_BUCKET_NAME: s3BucketName,
     TL_EXECUTE_FROM: "local",

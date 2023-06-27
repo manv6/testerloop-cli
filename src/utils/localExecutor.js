@@ -1,13 +1,13 @@
-const { getRunId, getInputData } = require("./helper");
+const { getInputData } = require("./helper");
 const { spawn } = require("child_process");
 const { handleResult, createFinalCommand } = require("./handlers");
 
-async function executeLocal() {
-  const { s3BucketName, customPath, uploadFilesToS3, s3Region } =
+async function executeLocal(runId, s3RunPath) {
+  const { s3BucketName, uploadFilesToS3, customPath, s3Region } =
     await getInputData();
 
   const reporterVariables = {
-    TL_RUN_ID: getRunId(),
+    TL_RUN_ID: runId,
     TL_TEST_ID: undefined,
     TL_S3_BUCKET_NAME: s3BucketName,
     TL_EXECUTE_FROM: "local",
@@ -42,7 +42,7 @@ async function executeLocal() {
   }
 
   child.on("close", async () => {
-    await handleResult(s3BucketName, customPath);
+    await handleResult(s3BucketName, s3RunPath, runId);
   });
 }
 

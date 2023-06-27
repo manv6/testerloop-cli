@@ -1,6 +1,5 @@
 const debug = require("debug");
 const {
-  getOrgUrl,
   setExitCode,
   getExitCode,
   clearValues,
@@ -10,8 +9,6 @@ const {
   createRunLinks,
   createFailedLinks,
   checkIfContainsTag,
-  getRerun,
-  getS3RunPath,
   getInputData,
   getTestStatesPerId,
   getTestResultsFromAllFilesOnlyOnceByTestName,
@@ -28,19 +25,19 @@ let executionType;
 const TAGS = {
   s3: "s3",
   throttling: "THROTTLING",
-  tags: "TAGS"
-}
+  tags: "TAGS",
+};
 
-async function handleResult(bucket) {
+async function handleResult(bucket, s3RunPath, runId) {
   const log = debug(TAGS.s3);
   // Grab the files from the s3 and store them locally to get results
-  const directory = `./logs/testResults/${getS3RunPath().replace(
+  const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
     ""
   )}/results`;
 
   try {
-    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
     log("ERROR fetching results from s3", err);
@@ -51,8 +48,9 @@ async function handleResult(bucket) {
     let failedTestResults;
     let passedTestResults;
     let allResultsOnce = [];
+    const { reporterBaseUrl, rerun } = await getInputData();
 
-    if (getRerun()) {
+    if (rerun) {
       console.log("Retrieving rerun results...");
 
       // In case of rerun on ECS/local we have the following case
@@ -84,9 +82,10 @@ async function handleResult(bucket) {
       );
     }
 
-    createRunLinks(getOrgUrl());
+    await createRunLinks(reporterBaseUrl, runId);
+
     if (failedTestResults.length > 0) {
-      await createFailedLinks(failedTestResults, getOrgUrl());
+      await createFailedLinks(runId, failedTestResults, reporterBaseUrl);
       setExitCode(1);
     } else {
       setExitCode(0);
@@ -102,14 +101,14 @@ async function handleResult(bucket) {
   process.exit(getExitCode());
 }
 
-async function getFailedLambdaTestResultsFromLocal(bucket) {
+async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
   const log = debug(TAGS.s3);
-  const directory = `./logs/testResults/${getS3RunPath().replace(
+  const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
     ""
   )}/results`;
   try {
-    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
     log("ERROR fetching results from s3", err);
@@ -132,15 +131,16 @@ async function getFailedLambdaTestResultsFromLocal(bucket) {
 
 async function getLambdaTestResultsFromLocalBasedOnId(
   bucket,
-  listOfTestIdsToCheckResults
+  listOfTestIdsToCheckResults,
+  s3RunPath
 ) {
   const log = debug(TAGS.throttling);
-  const directory = `./logs/testResults/${getS3RunPath().replace(
+  const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
     ""
   )}/results`;
   try {
-    await syncFilesFromS3(`s3://${getS3RunPath()}/results`, `logs/testResults`);
+    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
   } catch (err) {
     console.log("Could not retrieve results from s3");
     log("ERROR fetching results from s3", err);
@@ -209,7 +209,7 @@ async function createFinalCommand() {
   return finalCommand;
 }
 
-async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
+async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
   try {
     const lcl = new LCL();
     const commit = lcl.getLastCommitSync();
@@ -235,7 +235,7 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName) {
 
     uploadFileToS3(
       s3BucketName,
-      `${getS3RunPath().replace(s3BucketName + "/", "")}/logs/cicd.json`,
+      `${s3RunPath.replace(s3BucketName + "/", "")}/logs/cicd.json`,
       JSON.stringify({ ...commit, ...env })
     );
   } catch (err) {
