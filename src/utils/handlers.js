@@ -1,4 +1,4 @@
-const debug = require("debug");
+const LCL = require("last-commit-log");
 const {
   setExitCode,
   getExitCode,
@@ -17,19 +17,10 @@ const {
 const colors = require("colors");
 const { clearTheArgs } = require("./argumentsParser");
 const { sendEventsToLambda } = require("./eventProcessor");
-const { syncFilesFromS3, uploadFileToS3 } = require("./s3");
-const LCL = require("last-commit-log");
-
-let executionType;
-
-const TAGS = {
-  s3: "s3",
-  throttling: "THROTTLING",
-  tags: "TAGS",
-};
+const { syncS3TestResultsToLocal, uploadJSONToS3 } = require("../s3");
+const { debugS3, debugThrottling, debugTags } = require("../debug");
 
 async function handleResult(bucket, s3RunPath, runId) {
-  const log = debug(TAGS.s3);
   // Grab the files from the s3 and store them locally to get results
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
@@ -37,10 +28,10 @@ async function handleResult(bucket, s3RunPath, runId) {
   )}/results`;
 
   try {
-    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
+    await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    log("ERROR fetching results from s3", err);
+    debugS3("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -102,16 +93,15 @@ async function handleResult(bucket, s3RunPath, runId) {
 }
 
 async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
-  const log = debug(TAGS.s3);
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
     ""
   )}/results`;
   try {
-    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
+    await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    log("ERROR fetching results from s3", err);
+    debugS3("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -134,16 +124,15 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   listOfTestIdsToCheckResults,
   s3RunPath
 ) {
-  const log = debug(TAGS.throttling);
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + "/",
     ""
   )}/results`;
   try {
-    await syncFilesFromS3(`s3://${s3RunPath}/results`, `logs/testResults`);
+    await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
     console.log("Could not retrieve results from s3");
-    log("ERROR fetching results from s3", err);
+    debugThrottling("ERROR fetching results from s3", err);
     setExitCode(1);
   }
 
@@ -155,17 +144,8 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   return results;
 }
 
-function setExecutionType(input) {
-  console.log(`LOG: Execution type has been set as: '${input}'`);
-  executionType = input;
-}
-
-function getExecutionType() {
-  return executionType;
-}
 
 function determineFilePropertiesBasedOnTags(file, tag) {
-  const log = debug(TAGS.tags);
   // If tag exists then determine based on the tags
   // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
   let unWipedScenarios;
@@ -179,7 +159,7 @@ function determineFilePropertiesBasedOnTags(file, tag) {
         fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
       }
     });
-    log(
+    debugTags(
       "Included and excluded tags per file",
       tagsIncludedExcluded,
       " -> ",
@@ -233,11 +213,7 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
       return acc;
     }, env); // Check if each variable in additionalEnvsForLocalExecution is already in env
 
-    uploadFileToS3(
-      s3BucketName,
-      `${s3RunPath.replace(s3BucketName + "/", "")}/logs/cicd.json`,
-      JSON.stringify({ ...commit, ...env })
-    );
+    await uploadJSONToS3(s3BucketName, s3RunPath, { ...commit, ...env });
   } catch (err) {
     console.log("ERROR: Not able to upload the cicd.json file to s3.");
     console.log(
@@ -333,7 +309,6 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
   lambdaArn,
   envVariables
 ) {
-  const log = debug(TAGS.throttling);
   let listOfFilesToSend = [];
   let tempResults = [];
   let numberOfTestFilesSent = testsSentSoFar;
@@ -353,7 +328,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
         numberOfTestFilesSent++;
       }
     }
-    log("List of files to be sent on this iteration: ", listOfFilesToSend);
+    debugThrottling("List of files to be sent on this iteration: ", listOfFilesToSend);
 
     tempResults = await sendEventsToLambda(
       listOfFilesToSend,
@@ -382,10 +357,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
 }
 
 module.exports = {
-  TAGS,
   handleResult,
-  getExecutionType,
-  setExecutionType,
   handleExecutionTimeout,
   removeTestFromList,
   checkLambdaHasTimedOut,

@@ -1,3 +1,5 @@
+const colors = require("colors");
+
 const { wait, line, getInputData } = require("../helper");
 const {
   removeTestFromList,
@@ -5,11 +7,10 @@ const {
   checkLambdaHasTimedOut,
   sendTestsToLambdasBasedOnAvailableSlots,
 } = require("../handlers");
-const { checkFileExistsInS3 } = require("../s3");
-const colors = require("colors");
+const { checkFileExistsInS3 } = require("../../s3");
+const { debugThrottling } = require("../../debug");
 
 async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
-  const debug = require("debug")("THROTTLING");
   colors.enable();
   let { lambdaTimeOutSecs, s3BucketName, lambdaThreads, lambdaArn } =
     await getInputData();
@@ -70,7 +71,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
         ...newRequestIdsToCheck,
       ];
 
-      debug(
+      debugThrottling(
         "List of tests to check this iteration: ",
         listOfTestsToCheckResults
       );
@@ -81,7 +82,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
         const filePath = `${s3RunPath}/${test.tlTestId}/test.complete`;
         const fileExists = await checkFileExistsInS3(
           s3BucketName,
-          filePath.replace(s3BucketName + "/", "")
+          filePath
         );
         const lambdaHasTimedOut = await checkLambdaHasTimedOut(
           test,
@@ -99,8 +100,8 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
           availableSlots++;
         }
 
-        debug(`Available slots for next iteration: ${availableSlots}`);
-        debug(`Total lambdas triggered: ${totalNumberOfFilesSent}`);
+        debugThrottling(`Available slots for next iteration: ${availableSlots}`);
+        debugThrottling(`Total lambdas triggered: ${totalNumberOfFilesSent}`);
       }
     } catch (e) {
       console.log(e);
@@ -111,8 +112,8 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
     await wait(5000);
   }
   line();
-  debug("Lambdas which timed out: ", listOfLambdasWhichTimedOut);
-  debug("All tests send: ", allRequestIdsSent);
+  debugThrottling("Lambdas which timed out: ", listOfLambdasWhichTimedOut);
+  debugThrottling("All tests send: ", allRequestIdsSent);
   const allIdsMapped = allRequestIdsSent.map((test) => test.tlTestId);
   return { allIdsMapped, listOfLambdasWhichTimedOut };
 }

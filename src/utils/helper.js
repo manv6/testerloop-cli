@@ -163,7 +163,6 @@ function clearFeaturePath(featureFile) {
 }
 const fse = require("fs-extra");
 const path = require("path");
-const { syncFilesFromS3 } = require("./s3");
 
 async function getFilesSortedByMostRecent(directory, filePrefix) {
   try {

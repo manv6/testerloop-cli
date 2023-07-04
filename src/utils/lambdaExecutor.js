@@ -21,10 +21,10 @@ const {
   pollLambdasWithThrottling,
 } = require("./pollingFunctions/lambdaPoller");
 const { getLambdaEnvVariables } = require("./envVariables/envVariablesHandler");
+const { debugThrottling } = require("../debug");
 colors.enable();
 
 async function executeLambdas(runId, s3RunPath) {
-  const debug = require("debug")("THROTTLING");
   const { specFiles, s3BucketName, tag, rerun, reporterBaseUrl } =
     await getInputData();
 
@@ -67,8 +67,8 @@ async function executeLambdas(runId, s3RunPath) {
       listOfFilesToRerun.push(test.fileName);
     }
 
-    debug("listOfLambdasWhichTimedOut", listOfLambdasWhichTimedOut);
-    debug("listOfFailures", listOfFailedLambdaTests);
+    debugThrottling("listOfLambdasWhichTimedOut", listOfLambdasWhichTimedOut);
+    debugThrottling("listOfFailures", listOfFailedLambdaTests);
     listOfFilesToRerun = [
       ...new Set([...listOfFailedLambdaTests, ...listOfFilesToRerun]),
     ];
