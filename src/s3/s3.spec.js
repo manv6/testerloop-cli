@@ -25,7 +25,7 @@ describe("S3 operations", () => {
   it("should sync files from S3 to local path", async () => {
     const sync = jest.fn();
     S3SyncClient.mockReturnValueOnce({ sync });
-    getS3Client.mockReturnValueOnce({});
+    getS3Client.mockResolvedValueOnce({});
 
     await syncS3TestResultsToLocal("s3path", "localPath");
     expect(sync).toHaveBeenCalledWith("s3://s3path/results", "localPath");
@@ -33,7 +33,7 @@ describe("S3 operations", () => {
 
   it("should upload JSON file to S3", async () => {
     const send = jest.fn();
-    getS3Client.mockReturnValueOnce({ send });
+    getS3Client.mockResolvedValueOnce({ send });
     PutObjectCommand.mockReturnValueOnce({});
 
     await uploadJSONToS3("bucket", "s3RunPath", { test: "data" });
@@ -47,7 +47,7 @@ describe("S3 operations", () => {
 
   it("should check if a file exists in S3", async () => {
     const send = jest.fn().mockResolvedValueOnce(true);
-    getS3Client.mockReturnValueOnce({ send });
+    getS3Client.mockResolvedValueOnce({ send });
     HeadObjectCommand.mockReturnValueOnce({});
 
     const result = await checkFileExistsInS3("bucketName", "key");
@@ -61,7 +61,7 @@ describe("S3 operations", () => {
 
   it("should return false if file does not exist in S3", async () => {
     const send = jest.fn().mockRejectedValueOnce(new Error("Not found"));
-    getS3Client.mockReturnValueOnce({ send });
+    getS3Client.mockResolvedValueOnce({ send });
     HeadObjectCommand.mockReturnValueOnce({});
 
     const result = await checkFileExistsInS3("bucketName", "key");

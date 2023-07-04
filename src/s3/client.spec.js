@@ -12,28 +12,28 @@ describe("S3 Client", () => {
     clearClient();
   });
 
-  it("should create a new S3Client with the region from getInputData if no client is currently initialized", () => {
+  it("should create a new S3Client with the region from getInputData if no client is currently initialized", async () => {
     const mockS3Region = "us-west-2";
     const mockClient = { region: mockS3Region };
 
-    getInputData.mockReturnValueOnce({ s3Region: mockS3Region });
+    getInputData.mockResolvedValue({ s3Region: mockS3Region });
     S3Client.mockReturnValueOnce(mockClient);
 
-    const client = getS3Client();
+    const client = await getS3Client();
 
     expect(client).toEqual(mockClient);
     expect(S3Client).toHaveBeenCalledWith({ region: mockS3Region });
   });
 
-  it("should return an already initialized S3Client", () => {
+  it("should return an already initialized S3Client", async () => {
     const mockS3Region = "us-west-2";
     const mockClient = { region: mockS3Region };
 
-    getInputData.mockReturnValueOnce({ s3Region: mockS3Region });
+    getInputData.mockResolvedValue({ s3Region: mockS3Region });
     S3Client.mockReturnValueOnce(mockClient);
 
-    const firstCallClient = getS3Client();
-    const secondCallClient = getS3Client();
+    const firstCallClient = await getS3Client();
+    const secondCallClient = await getS3Client();
 
     expect(firstCallClient).toBe(secondCallClient);
     expect(S3Client).toHaveBeenCalledTimes(1);

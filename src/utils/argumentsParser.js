@@ -1,15 +1,20 @@
 const arg = require("arg");
-const args = arg({}, { permissive: true });
 
-async function parseArguments() {
+function parseArguments() {
+  const args = arg({}, { permissive: true });
   const cliArgs = args._;
+
   return cliArgs;
 }
 
 async function clearTheArgs(argsToRemoveArray) {
+  const args = arg({}, { permissive: true });
+
+  console.log('args', args);
   const getArgs = async () => {
     return args._;
   };
+
   return getArgs().then((cliArgs) => {
     for (const argToRemove of argsToRemoveArray) {
       const argIndex = cliArgs.indexOf(argToRemove.argName);
@@ -22,6 +27,7 @@ async function clearTheArgs(argsToRemoveArray) {
         }
       }
     }
+
     return cliArgs;
   });
 }

@@ -1,8 +1,8 @@
 const {
   getEnvVariableWithValues,
   getEnvVariableValuesFromCi,
-} = require("../../utils/handlers");
-const { getInputData } = require("../../utils/helper");
+} = require("../handlers");
+const { getInputData } = require("../helper");
 const {
   getLambdaEnvVariables,
   getEcsEnvVariables,

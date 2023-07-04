@@ -1,18 +1,15 @@
 const { cucumberSlicer } = require("cucumber-cypress-slicer");
+const path = require("path");
+const glob = require("glob");
 
 function findFeatureFilesRecursively(directory) {
-  const path = require("path");
-  const glob = require("glob");
-
   const featureFiles = [];
 
   const processFolder = (folderPath) => {
-    const files = glob.sync(path.join(folderPath, "*.feature"));
-    for (const file of files) {
-      featureFiles.push(file);
-    }
+    const files = glob.sync(path.join(folderPath, "*.feature")) || [];
+    featureFiles.push(...files);
 
-    const subfolders = glob.sync(path.join(folderPath, "*/"));
+    const subfolders = glob.sync(path.join(folderPath, "*/")) || [];
 
     for (const subfolder of subfolders) {
       processFolder(subfolder);
@@ -29,15 +26,19 @@ async function sliceFeatureFilesRecursively(specFilePath) {
   const featureFilesToSplit = [];
   let filesToExecute = findFeatureFilesRecursively(specFilePath);
 
+  console.log("filesToExecute", filesToExecute);
   // Replace the feature file names with a * pattern and put in a unique set
   for (const fileWithName of filesToExecute) {
+    console.log("fileWithName", fileWithName);
     const segments = fileWithName.split("/");
     segments.pop();
+    console.log("segments", segments);
     const transformedString = segments.join("/") + "/*.feature";
     featureFilesToSplit.push(transformedString);
   }
   const uniqueFeaturesPatternArray = [...new Set(featureFilesToSplit)];
 
+  console.log("uniqueFeaturesPatternArray", uniqueFeaturesPatternArray);
   // Refactor to accept multiple files
   // Slice the found feature files to create the parsed files
   for (let patternToSlice of uniqueFeaturesPatternArray) {
@@ -57,4 +58,4 @@ async function sliceFeatureFilesRecursively(specFilePath) {
   return slicedFiles;
 }
 
-module.exports = { sliceFeatureFilesRecursively, findFeatureFilesRecursively };
+module.exports = { sliceFeatureFilesRecursively };

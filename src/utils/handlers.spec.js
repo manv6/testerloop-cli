@@ -11,10 +11,9 @@ const {
   getFailedLambdaTestResultsFromLocal,
   determineFilePropertiesBasedOnTags,
 } = require("./handlers");
-const { sendEventsToLambda } = require("./eventProcessor");
 const { clearTheArgs } = require("./argumentsParser");
 const argumentsParser = require("./argumentsParser");
-const eventProcessor = require("./eventProcessor");
+const eventProcessor = require("../lambda/eventProcessor");
 const helper = require("./helper");
 const s3 = require("../s3");
 const debug = require("../debug");
@@ -44,7 +43,7 @@ jest.mock("./helper", () => ({
   checkIfContainsTag: jest.fn(),
   checkIfAllWiped: jest.fn(),
 }));
-jest.mock("./eventProcessor", () => ({
+jest.mock("../lambda/eventProcessor", () => ({
   sendEventsToLambda: jest.fn(),
 }));
 
@@ -405,7 +404,7 @@ describe("handlers", () => {
         );
 
         expect(result).toEqual(expectedResult);
-        expect(sendEventsToLambda).toHaveBeenCalledWith(
+        expect(eventProcessor.sendEventsToLambda).toHaveBeenCalledWith(
           ["file1", "file2"],
           "arn:aws:lambda:us-east-1:123456789:function:testFunction",
           { envVar1: "value1", envVar2: "value2" }
@@ -432,7 +431,7 @@ describe("handlers", () => {
         );
 
         expect(result).toEqual(expectedResult);
-        expect(sendEventsToLambda).not.toHaveBeenCalled();
+        expect(eventProcessor.sendEventsToLambda).not.toHaveBeenCalled();
       });
 
       test("should return an empty array when testsSentSoFar is greater than or equal to allFilesToBeSent.length", async () => {
@@ -455,7 +454,7 @@ describe("handlers", () => {
         );
 
         expect(result).toEqual(expectedResult);
-        expect(sendEventsToLambda).not.toHaveBeenCalled();
+        expect(eventProcessor.sendEventsToLambda).not.toHaveBeenCalled();
       });
     });
   });

@@ -1,14 +1,14 @@
 const colors = require("colors");
 
-const { wait, line, getInputData } = require("../helper");
+const { wait, line, getInputData } = require("../utils/helper");
 const {
   removeTestFromList,
   handleExecutionTimeout,
   checkLambdaHasTimedOut,
   sendTestsToLambdasBasedOnAvailableSlots,
-} = require("../handlers");
-const { checkFileExistsInS3 } = require("../../s3");
-const { debugThrottling } = require("../../debug");
+} = require("../utils/handlers");
+const { checkFileExistsInS3 } = require("../s3");
+const { debugThrottling } = require("../debug");
 
 async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
   colors.enable();
@@ -49,7 +49,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
   let timedOut = false;
   while (
     (listOfTestsToCheckResults.length > 0 ||
-      totalNumberOfFilesSent !== allFilesToBeSent.length) &&
+      (totalNumberOfFilesSent && totalNumberOfFilesSent !== allFilesToBeSent.length)) &&
     timedOut !== true
   ) {
     try {
@@ -80,10 +80,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
       // Determine if a test has finished or polling has timed out for it
       for (let test of remainingIds) {
         const filePath = `${s3RunPath}/${test.tlTestId}/test.complete`;
-        const fileExists = await checkFileExistsInS3(
-          s3BucketName,
-          filePath
-        );
+        const fileExists = await checkFileExistsInS3(s3BucketName, filePath);
         const lambdaHasTimedOut = await checkLambdaHasTimedOut(
           test,
           lambdaTimeOutSecs
@@ -100,7 +97,9 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
           availableSlots++;
         }
 
-        debugThrottling(`Available slots for next iteration: ${availableSlots}`);
+        debugThrottling(
+          `Available slots for next iteration: ${availableSlots}`
+        );
         debugThrottling(`Total lambdas triggered: ${totalNumberOfFilesSent}`);
       }
     } catch (e) {

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
 
 const colors = require("colors");
-colors.enable();
+
+const { createAndUploadCICDFileToS3Bucket } = require("./src/utils/handlers");
+const { executeEcs } = require("./src/ecs/ecsExecutor");
+const { executeLocal } = require("./src/local/localExecutor");
+const { executeLambdas } = require("./src/lambda/lambdaExecutor");
 const {
-  createAndUploadCICDFileToS3Bucket,
-} = require("./src/utils/handlers");
+  getInputData,
+  line,
+  getNewRunId,
+  getS3RunPath,
+  showHelp,
+} = require("./src/utils/helper");
 
-const { getInputData } = require("./src/utils/helper");
-
-const { executeEcs } = require("./src/utils/ecsExecutor");
-const { executeLocal } = require("./src/utils/localExecutor");
-const { executeLambdas } = require("./src/utils/lambdaExecutor");
-const { line, getNewRunId, getS3RunPath, showHelp } = require("./src/utils/helper");
-const { initializeLambdaClient } = require("./src/utils/eventProcessor");
-const { initializeECSClient } = require("./src/utils/taskProcessor");
+colors.enable();
 
 async function main() {
   const {
@@ -42,11 +43,9 @@ async function main() {
     // Execute
     switch (executionTypeInput) {
       case "lambda":
-        initializeLambdaClient(lambdaRegion);
         await executeLambdas(runId, s3RunPath);
         break;
       case "ecs":
-        initializeECSClient(ecsRegion);
         await executeEcs(runId, s3RunPath);
         break;
       default:

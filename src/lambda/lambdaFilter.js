@@ -1,5 +1,5 @@
-const { determineFilePropertiesBasedOnTags } = require("../handlers");
-const { findArrayDifference } = require("../helper");
+const { determineFilePropertiesBasedOnTags } = require("../utils/handlers");
+const { findArrayDifference } = require("../utils/helper");
 async function filterFeatureFilesByTag(featureFiles, tag) {
   // Determine the final files based on the tags
   const filesToIncludeBasedOnTags = [];

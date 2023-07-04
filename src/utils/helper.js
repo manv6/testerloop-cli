@@ -2,6 +2,8 @@ const { parseArguments } = require("./argumentsParser");
 const { v4 } = require("uuid");
 const { readFileSync, readFile } = require("fs");
 
+const defaultExecutionType = "local";
+
 let exitCode;
 
 function wait(ms = 5000) {
@@ -65,13 +67,13 @@ function clearValues(object, keysArray = []) {
 }
 
 async function getInputData() {
-  const cliArgs = await parseArguments();
+  const cliArgs =  parseArguments();
 
   // Load JSON data from .testerlooprc file
   let configurationData = await readConfigurationFIle(".testerlooprc.json");
 
   // Override JSON data with CLI arguments
-  let specFiles,
+  let specFilesPath,
     lambdaTimeOutSecs,
     executionTypeInput,
     tag,
@@ -87,7 +89,7 @@ async function getInputData() {
         showOnlyResultsForId = cliArgs[i + 1];
         break;
       case "--test-spec-folder":
-        specFiles = cliArgs[i + 1];
+        specFilesPath = cliArgs[i + 1];
         break;
       case "--lambdaTimeoutInSeconds":
         lambdaTimeOutSecs = cliArgs[i + 1];
@@ -119,7 +121,7 @@ async function getInputData() {
     }
   }
   return {
-    specFiles: specFiles,
+    specFilesPath,
     lambdaArn: configurationData.lambda?.lambdaArn,
     testerLoopKeyId: configurationData.testerLoopKeyId,
     executionTimeOutSecs: configurationData.executionTimeOutSecs || 1200,
@@ -128,7 +130,7 @@ async function getInputData() {
       lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
     lambdaThreads:
       lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
-    executionTypeInput: executionTypeInput,
+    executionTypeInput: executionTypeInput || defaultExecutionType,
     containerName: configurationData.ecs?.containerName,
     clusterARN: configurationData.ecs?.clusterARN,
     taskDefinition: configurationData.ecs?.taskDefinition,
@@ -366,6 +368,9 @@ function categorizeTags(inputString) {
   let includedTags = [];
   let excludedTags = [];
   const allTags = extractTags(inputString);
+
+  // includeTags: @tag1 @tag2, excludeTags: not @tag
+  // @tag1 not @tag2 @tag3 - tag3 will be included and tag2 excluded
   const regex = /not\s+((\(@\w+(\s+and\s+@\w+)*\))|@\w+)/g;
 
   let match = regex.exec(inputString);
@@ -381,16 +386,29 @@ function categorizeTags(inputString) {
 function checkIfContainsTag(filename, str) {
   const contents = readFileSync(filename, "utf-8");
   const re = RegExp(`(^|\\s)${str}(\\s|$)`);
-  return contents.match(re);
+
+  return !!contents.match(re);
 }
 
 function checkIfAllWiped(filename, tag) {
   // Check if every scenario is wipped
   const contents = readFileSync(filename, "utf-8");
-  let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
-  numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
+
   const tagRegex = new RegExp(`${tag}`, "g");
   const numOfTagged = (contents.match(tagRegex) || []).length;
+
+  if (!numOfTagged) {
+    return true;
+  }
+
+  console.log('numb of tagged', numOfTagged);
+  let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
+  numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
+
+  if (!numOfScenarios) {
+    return true;
+  }
+
   return numOfTagged < numOfScenarios;
 }
 
@@ -506,4 +524,5 @@ module.exports = {
   getInputData,
   extractTags,
   getNonCommonElements,
+  getOrgUrl
 };

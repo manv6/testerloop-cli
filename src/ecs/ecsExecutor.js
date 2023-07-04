@@ -1,15 +1,18 @@
 const glob = require("glob");
+const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
+
 const {
   handleResult,
   determineFilePropertiesBasedOnTags,
-} = require("./handlers");
-const { getEcsEnvVariables } = require("./envVariables/envVariablesHandler");
-const { sendCommandToEcs, getEcsClient } = require("./taskProcessor");
-const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
-const { getInputData } = require("./helper");
+} = require("../utils/handlers");
+const { getEcsEnvVariables } = require("../utils/envVariables/envVariablesHandler");
+const { sendCommandToEcs } = require("./taskProcessor");
+const { getInputData } = require("../utils/helper");
+const { getEcsClient } = require("./client");
+
 async function executeEcs(runId, s3RunPath) {
   const {
-    specFiles,
+    specFilesPath,
     tag,
     containerName,
     clusterARN,
@@ -24,8 +27,8 @@ async function executeEcs(runId, s3RunPath) {
 
   // Check if we passed one feature file or a whole folder of feature files
   let suffix = "/*.feature";
-  if (specFiles.includes(".feature") === true) suffix = "";
-  const files = glob.sync(`${specFiles}${suffix}`).map((file) => `${file}`);
+  if (specFilesPath.includes(".feature") === true) suffix = "";
+  const files = glob.sync(`${specFilesPath}${suffix}`).map((file) => `${file}`);
 
   const tasks = [];
   const taskDetails = [];
@@ -98,7 +101,7 @@ async function executeEcs(runId, s3RunPath) {
     try {
       waitECSTask = await waitUntilTasksStopped(
         {
-          client: getEcsClient(),
+          client: await getEcsClient(),
           maxWaitTime: 1200,
           maxDelay: 10,
           minDelay: 5,

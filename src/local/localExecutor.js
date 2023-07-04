@@ -1,6 +1,7 @@
-const { getInputData } = require("./helper");
 const { spawn } = require("child_process");
-const { handleResult, createFinalCommand } = require("./handlers");
+
+const { getInputData } = require("../utils/helper");
+const { handleResult, createFinalCommand } = require("../utils/handlers");
 
 async function executeLocal(runId, s3RunPath) {
   const { s3BucketName, uploadFilesToS3, customPath, s3Region } =
@@ -29,7 +30,6 @@ async function executeLocal(runId, s3RunPath) {
   reporterVariablesString = reporterVariablesString.trim();
 
   let command = await createFinalCommand(false);
-  console.log("Executing command: ", command);
   command = reporterVariablesString + " " + command;
 
   const child = spawn(command, { shell: true, stdio: "inherit" });

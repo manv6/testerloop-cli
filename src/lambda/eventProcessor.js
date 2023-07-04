@@ -1,25 +1,19 @@
 const {
-  LambdaClient,
   InvokeCommand,
   LogType,
-  InvocationType,
+  InvocationType
 } = require("@aws-sdk/client-lambda");
 
-let client;
-
-function initializeLambdaClient(lambdaRegion) {
-  client = new LambdaClient({
-    region: lambdaRegion,
-  });
-}
+const {getLambdaClient} = require("./client");
 
 async function sendEventsToLambda(files, lambdaArn, envVars) {
+  const client = await getLambdaClient();
+
   return new Promise(async (resolve) => {
     try {
-      let command;
       const results = await Promise.all(
         files.map(async (file) => {
-          command = new InvokeCommand({
+          const command = new InvokeCommand({
             FunctionName: lambdaArn,
             InvocationType: InvocationType.Event,
             Payload: JSON.stringify({
@@ -34,8 +28,9 @@ async function sendEventsToLambda(files, lambdaArn, envVars) {
       resolve(results);
     } catch (error) {
       console.log("ERROR: could not send events", error);
+      resolve();
     }
   });
 }
 
-module.exports = { sendEventsToLambda, initializeLambdaClient };
+module.exports = { sendEventsToLambda };

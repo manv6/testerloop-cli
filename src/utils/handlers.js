@@ -16,7 +16,7 @@ const {
 
 const colors = require("colors");
 const { clearTheArgs } = require("./argumentsParser");
-const { sendEventsToLambda } = require("./eventProcessor");
+const { sendEventsToLambda } = require("../lambda/eventProcessor");
 const { syncS3TestResultsToLocal, uploadJSONToS3 } = require("../s3");
 const { debugS3, debugThrottling, debugTags } = require("../debug");
 

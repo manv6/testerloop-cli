@@ -5,31 +5,31 @@ const {
   getExitCode,
   line,
   getInputData,
-} = require("./helper");
+} = require("../utils/helper");
 
 const {
   handleResult,
   getFailedLambdaTestResultsFromLocal,
   getLambdaTestResultsFromLocalBasedOnId,
-} = require("./handlers");
+} = require("../utils/handlers");
 const {
   sliceFeatureFilesRecursively,
-} = require("../utils/slicerFunctions/lambdaSlicer");
-const { filterFeatureFilesByTag } = require("./filterFunctions/lambdaFilter");
+} = require("./lambdaSlicer");
+const { filterFeatureFilesByTag } = require("./lambdaFilter");
 const colors = require("colors");
 const {
   pollLambdasWithThrottling,
-} = require("./pollingFunctions/lambdaPoller");
-const { getLambdaEnvVariables } = require("./envVariables/envVariablesHandler");
+} = require("./lambdaPoller");
+const { getLambdaEnvVariables } = require("../utils/envVariables/envVariablesHandler");
 const { debugThrottling } = require("../debug");
 colors.enable();
 
 async function executeLambdas(runId, s3RunPath) {
-  const { specFiles, s3BucketName, tag, rerun, reporterBaseUrl } =
+  const { specFilesPath, s3BucketName, tag, rerun, reporterBaseUrl } =
     await getInputData();
 
   // Get the sliced files based on the provided path and filter them by tag
-  const slicedFiles = await sliceFeatureFilesRecursively(specFiles);
+  const slicedFiles = await sliceFeatureFilesRecursively(specFilesPath);
   const finalFilesToSendToLambda = await filterFeatureFilesByTag(
     slicedFiles,
     tag

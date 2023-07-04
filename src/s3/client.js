@@ -13,12 +13,12 @@ function initializeS3Client(s3Region) {
   return s3Client;
 }
 
-function getS3Client() {
+async function getS3Client() {
   if (s3Client) {
     return s3Client;
   }
 
-  const { s3Region } = getInputData();
+  const { s3Region } = await getInputData();
 
   return initializeS3Client(s3Region);
 }
