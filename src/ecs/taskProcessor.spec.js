@@ -1,80 +1,80 @@
-const { getEcsClient } = require("./client");
-const { RunTaskCommand, ECSClient } = require("@aws-sdk/client-ecs");
-const { sendCommandToEcs } = require("./taskProcessor"); // replace with the correct relative path to your module
+const { RunTaskCommand } = require('@aws-sdk/client-ecs');
 
-jest.mock("./client", () => ({
-  getEcsClient: jest.fn()
+const { getEcsClient } = require('./client');
+const { sendCommandToEcs } = require('./taskProcessor'); // replace with the correct relative path to your module
+
+jest.mock('./client', () => ({
+  getEcsClient: jest.fn(),
 }));
 
-jest.mock("@aws-sdk/client-ecs", () => ({
+jest.mock('@aws-sdk/client-ecs', () => ({
   RunTaskCommand: jest.fn(),
-  ECSClient: jest.fn()
+  ECSClient: jest.fn(),
 }));
 
-describe("sendCommandToEcs", () => {
+describe('sendCommandToEcs', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     getEcsClient.mockClear();
   });
 
-  it("should send command to ECS successfully", async () => {
-    getEcsClient.mockResolvedValueOnce({send: jest.fn().mockReturnValue({ tasks: [{taskArn: "taskArn" }]})});
+  it('should send command to ECS successfully', async () => {
+    getEcsClient.mockResolvedValueOnce({
+      send: jest.fn().mockReturnValue({ tasks: [{ taskArn: 'taskArn' }] }),
+    });
 
     const taskArn = await sendCommandToEcs(
-      "containerName",
-      "runCommand",
-      "clusterARN",
-      "taskDefinition",
-      ["subnet"],
-      ["securityGroups"],
-      "uploadToS3RoleArn",
-      ["envVariableList"],
-      "ecsPublicIp"
+      'containerName',
+      'runCommand',
+      'clusterARN',
+      'taskDefinition',
+      ['subnet'],
+      ['securityGroups'],
+      'uploadToS3RoleArn',
+      ['envVariableList'],
+      'ecsPublicIp',
     );
 
-    expect(taskArn).toBe("taskArn");
-    expect(RunTaskCommand).toBeCalledWith(
-      {
-        cluster: "clusterARN",
-        taskDefinition: "taskDefinition",
-        launchType: "FARGATE",
-        networkConfiguration: {
-          awsvpcConfiguration: {
-            assignPublicIp: "DISABLED",
-            subnets: ["subnet"],
-            securityGroups: ["securityGroups"],
+    expect(taskArn).toBe('taskArn');
+    expect(RunTaskCommand).toBeCalledWith({
+      cluster: 'clusterARN',
+      taskDefinition: 'taskDefinition',
+      launchType: 'FARGATE',
+      networkConfiguration: {
+        awsvpcConfiguration: {
+          assignPublicIp: 'DISABLED',
+          subnets: ['subnet'],
+          securityGroups: ['securityGroups'],
+        },
+      },
+      overrides: {
+        containerOverrides: [
+          {
+            name: 'containerName',
+            command: 'runCommand',
+            environment: ['envVariableList'],
           },
-        },
-        overrides: {
-          containerOverrides: [
-            {
-              name: "containerName",
-              command: "runCommand",
-              environment: ["envVariableList"],
-            },
-          ],
-          taskRoleArn: "uploadToS3RoleArn",
-        },
-      }
-    );
+        ],
+        taskRoleArn: 'uploadToS3RoleArn',
+      },
+    });
   });
 
-  it("should throw error when sending command to ECS fails", async () => {
-    getEcsClient.mockRejectedValue(new Error("new error"));
+  it('should throw error when sending command to ECS fails', async () => {
+    getEcsClient.mockRejectedValue(new Error('new error'));
 
     await expect(
       sendCommandToEcs(
-        "containerName",
-        "runCommand",
-        "clusterARN",
-        "taskDefinition",
-        ["subnet"],
-        ["securityGroups"],
-        "uploadToS3RoleArn",
-        ["envVariableList"],
-        "ecsPublicIp"
-      )
-    ).rejects.toThrow("new error");
+        'containerName',
+        'runCommand',
+        'clusterARN',
+        'taskDefinition',
+        ['subnet'],
+        ['securityGroups'],
+        'uploadToS3RoleArn',
+        ['envVariableList'],
+        'ecsPublicIp',
+      ),
+    ).rejects.toThrow('new error');
   });
 });
-

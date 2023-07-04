@@ -1,10 +1,11 @@
-const { ECSClient } = require("@aws-sdk/client-ecs");
+const { ECSClient } = require('@aws-sdk/client-ecs');
 
-const { getInputData } = require("../utils/helper");
-const { getEcsClient, clearClient } = require("./client");
+const { getInputData } = require('../utils/helper');
 
-jest.mock("../utils/helper", () => ({getInputData: jest.fn()}));
-jest.mock("@aws-sdk/client-ecs", () => ({ECSClient: jest.fn()}));
+const { getEcsClient, clearClient } = require('./client');
+
+jest.mock('../utils/helper', () => ({ getInputData: jest.fn() }));
+jest.mock('@aws-sdk/client-ecs', () => ({ ECSClient: jest.fn() }));
 
 describe('ECS Client', () => {
   const ecsClientInstance = {};
@@ -14,10 +15,8 @@ describe('ECS Client', () => {
     clearClient();
   });
 
-
   test('getEcsClient: should return existing client if already initialized', async () => {
-    
-    getInputData.mockReturnValue({ecsRegion});
+    getInputData.mockReturnValue({ ecsRegion });
 
     const client1 = await getEcsClient();
     const client2 = await getEcsClient();
@@ -27,10 +26,8 @@ describe('ECS Client', () => {
   });
 
   test('getEcsClient: should initialize and return new client if not already initialized', async () => {
-    
     getInputData.mockReturnValue({ ecsRegion });
     ECSClient.mockReturnValue(ecsClientInstance);
-
 
     const client = await getEcsClient();
 
@@ -38,4 +35,3 @@ describe('ECS Client', () => {
     expect(getInputData).toHaveBeenCalledTimes(1);
   });
 });
-

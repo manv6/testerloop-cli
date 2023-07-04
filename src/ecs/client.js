@@ -1,5 +1,6 @@
-const { ECSClient } = require("@aws-sdk/client-ecs");
-const { getInputData } = require("../utils/helper");
+const { ECSClient } = require('@aws-sdk/client-ecs');
+
+const { getInputData } = require('../utils/helper');
 
 let client;
 

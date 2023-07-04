@@ -1,8 +1,6 @@
-const {
-  LambdaClient,
-} = require("@aws-sdk/client-lambda");
+const { LambdaClient } = require('@aws-sdk/client-lambda');
 
-const { getInputData } = require("../utils/helper");
+const { getInputData } = require('../utils/helper');
 
 let client;
 

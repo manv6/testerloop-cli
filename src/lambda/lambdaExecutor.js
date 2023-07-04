@@ -1,3 +1,5 @@
+const colors = require('colors');
+
 const {
   createRunLinks,
   createFailedLinks,
@@ -5,23 +7,21 @@ const {
   getExitCode,
   line,
   getInputData,
-} = require("../utils/helper");
-
+} = require('../utils/helper');
 const {
   handleResult,
   getFailedLambdaTestResultsFromLocal,
   getLambdaTestResultsFromLocalBasedOnId,
-} = require("../utils/handlers");
+} = require('../utils/handlers');
 const {
-  sliceFeatureFilesRecursively,
-} = require("./lambdaSlicer");
-const { filterFeatureFilesByTag } = require("./lambdaFilter");
-const colors = require("colors");
-const {
-  pollLambdasWithThrottling,
-} = require("./lambdaPoller");
-const { getLambdaEnvVariables } = require("../utils/envVariables/envVariablesHandler");
-const { debugThrottling } = require("../debug");
+  getLambdaEnvVariables,
+} = require('../utils/envVariables/envVariablesHandler');
+const { debugThrottling } = require('../debug');
+
+const { sliceFeatureFilesRecursively } = require('./lambdaSlicer');
+const { filterFeatureFilesByTag } = require('./lambdaFilter');
+const { pollLambdasWithThrottling } = require('./lambdaPoller');
+
 colors.enable();
 
 async function executeLambdas(runId, s3RunPath) {
@@ -32,29 +32,29 @@ async function executeLambdas(runId, s3RunPath) {
   const slicedFiles = await sliceFeatureFilesRecursively(specFilesPath);
   const finalFilesToSendToLambda = await filterFeatureFilesByTag(
     slicedFiles,
-    tag
+    tag,
   );
   const envVars = await getLambdaEnvVariables(runId);
 
   const { listOfLambdasWhichTimedOut } = await pollLambdasWithThrottling(
     finalFilesToSendToLambda,
     envVars,
-    s3RunPath
+    s3RunPath,
   );
-  console.log("RUN FINISHED");
+  console.log('RUN FINISHED');
 
   if (listOfLambdasWhichTimedOut.length > 0) {
     line();
     console.log(
-      colors.yellow("Some tests timed out during this run: "),
-      listOfLambdasWhichTimedOut
+      colors.yellow('Some tests timed out during this run: '),
+      listOfLambdasWhichTimedOut,
     );
   }
   line();
   // Get the failed tests results from local
   const listOfFailedLambdaTests = await getFailedLambdaTestResultsFromLocal(
     s3BucketName,
-    s3RunPath
+    s3RunPath,
   );
 
   if (
@@ -67,37 +67,37 @@ async function executeLambdas(runId, s3RunPath) {
       listOfFilesToRerun.push(test.fileName);
     }
 
-    debugThrottling("listOfLambdasWhichTimedOut", listOfLambdasWhichTimedOut);
-    debugThrottling("listOfFailures", listOfFailedLambdaTests);
+    debugThrottling('listOfLambdasWhichTimedOut', listOfLambdasWhichTimedOut);
+    debugThrottling('listOfFailures', listOfFailedLambdaTests);
     listOfFilesToRerun = [
       ...new Set([...listOfFailedLambdaTests, ...listOfFilesToRerun]),
     ];
 
     console.log(
       colors.yellow(
-        "* There are timed out lambdas or failed tests and rerun has been enabled "
-      )
+        '* There are timed out lambdas or failed tests and rerun has been enabled ',
+      ),
     );
-    console.log("Rerunning the below tests", listOfFilesToRerun);
+    console.log('Rerunning the below tests', listOfFilesToRerun);
     const {
       allIdsMapped: requestIdsToCheckForRerun,
       listOfLambdasWhichTimedOut: rerunTimedOutLambdasList,
     } = await pollLambdasWithThrottling(listOfFilesToRerun, envVars, s3RunPath);
-    console.log("RUN FINISHED");
+    console.log('RUN FINISHED');
     line();
     const rerunTestResults = await getLambdaTestResultsFromLocalBasedOnId(
       s3BucketName,
       requestIdsToCheckForRerun,
-      s3RunPath
+      s3RunPath,
     );
     const failedTestResults = rerunTestResults.filter(
-      (testResult) => testResult.status === "failed"
+      (testResult) => testResult.status === 'failed',
     );
 
     if (rerunTimedOutLambdasList.length > 0) {
       console.log(
-        colors.yellow("Some tests timed out during rerun: "),
-        rerunTimedOutLambdasList
+        colors.yellow('Some tests timed out during rerun: '),
+        rerunTimedOutLambdasList,
       );
     }
 

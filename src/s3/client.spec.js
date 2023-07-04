@@ -1,19 +1,20 @@
-const { S3Client } = require("@aws-sdk/client-s3");
+const { S3Client } = require('@aws-sdk/client-s3');
 
-const { getInputData } = require("../utils/helper");
-const { getS3Client, clearClient } = require("./client");
+const { getInputData } = require('../utils/helper');
 
-jest.mock("@aws-sdk/client-s3");
-jest.mock("../utils/helper");
+const { getS3Client, clearClient } = require('./client');
 
-describe("S3 Client", () => {
+jest.mock('@aws-sdk/client-s3');
+jest.mock('../utils/helper');
+
+describe('S3 Client', () => {
   afterEach(() => {
     jest.resetAllMocks();
     clearClient();
   });
 
-  it("should create a new S3Client with the region from getInputData if no client is currently initialized", async () => {
-    const mockS3Region = "us-west-2";
+  it('should create a new S3Client with the region from getInputData if no client is currently initialized', async () => {
+    const mockS3Region = 'us-west-2';
     const mockClient = { region: mockS3Region };
 
     getInputData.mockResolvedValue({ s3Region: mockS3Region });
@@ -25,8 +26,8 @@ describe("S3 Client", () => {
     expect(S3Client).toHaveBeenCalledWith({ region: mockS3Region });
   });
 
-  it("should return an already initialized S3Client", async () => {
-    const mockS3Region = "us-west-2";
+  it('should return an already initialized S3Client', async () => {
+    const mockS3Region = 'us-west-2';
     const mockClient = { region: mockS3Region };
 
     getInputData.mockResolvedValue({ s3Region: mockS3Region });
@@ -39,4 +40,3 @@ describe("S3 Client", () => {
     expect(S3Client).toHaveBeenCalledTimes(1);
   });
 });
-

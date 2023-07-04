@@ -1,10 +1,10 @@
 const {
   InvokeCommand,
   LogType,
-  InvocationType
-} = require("@aws-sdk/client-lambda");
+  InvocationType,
+} = require('@aws-sdk/client-lambda');
 
-const {getLambdaClient} = require("./client");
+const { getLambdaClient } = require('./client');
 
 async function sendEventsToLambda(files, lambdaArn, envVars) {
   const client = await getLambdaClient();
@@ -23,11 +23,11 @@ async function sendEventsToLambda(files, lambdaArn, envVars) {
             LogType: LogType.Tail,
           });
           return await client.send(command);
-        })
+        }),
       );
       resolve(results);
     } catch (error) {
-      console.log("ERROR: could not send events", error);
+      console.log('ERROR: could not send events', error);
       resolve();
     }
   });

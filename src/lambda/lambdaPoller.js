@@ -1,14 +1,14 @@
-const colors = require("colors");
+const colors = require('colors');
 
-const { wait, line, getInputData } = require("../utils/helper");
+const { wait, line, getInputData } = require('../utils/helper');
 const {
   removeTestFromList,
   handleExecutionTimeout,
   checkLambdaHasTimedOut,
   sendTestsToLambdasBasedOnAvailableSlots,
-} = require("../utils/handlers");
-const { checkFileExistsInS3 } = require("../s3");
-const { debugThrottling } = require("../debug");
+} = require('../utils/handlers');
+const { checkFileExistsInS3 } = require('../s3');
+const { debugThrottling } = require('../debug');
 
 async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
   colors.enable();
@@ -34,7 +34,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
     totalNumberOfFilesSent,
     lambdaThreads,
     lambdaArn,
-    envVars
+    envVars,
   );
   availableSlots = 0;
   totalNumberOfFilesSent = requestIdsToCheck.length;
@@ -42,14 +42,15 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
   allRequestIdsSent = [...requestIdsToCheck];
 
   line();
-  console.log("Polling for test results in s3...");
+  console.log('Polling for test results in s3...');
   console.log(`Using ${lambdaThreads} number of parallel lambdas`);
   line();
   let timeCounter = 0;
   let timedOut = false;
   while (
     (listOfTestsToCheckResults.length > 0 ||
-      (totalNumberOfFilesSent && totalNumberOfFilesSent !== allFilesToBeSent.length)) &&
+      (totalNumberOfFilesSent &&
+        totalNumberOfFilesSent !== allFilesToBeSent.length)) &&
     timedOut !== true
   ) {
     try {
@@ -60,7 +61,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
         totalNumberOfFilesSent,
         lambdaThreads,
         lambdaArn,
-        envVars
+        envVars,
       );
       availableSlots = 0;
       totalNumberOfFilesSent += newRequestIdsToCheck.length;
@@ -72,8 +73,8 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
       ];
 
       debugThrottling(
-        "List of tests to check this iteration: ",
-        listOfTestsToCheckResults
+        'List of tests to check this iteration: ',
+        listOfTestsToCheckResults,
       );
 
       const remainingIds = listOfTestsToCheckResults;
@@ -83,14 +84,14 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
         const fileExists = await checkFileExistsInS3(s3BucketName, filePath);
         const lambdaHasTimedOut = await checkLambdaHasTimedOut(
           test,
-          lambdaTimeOutSecs
+          lambdaTimeOutSecs,
         );
 
         if (lambdaHasTimedOut) {
           listOfLambdasWhichTimedOut.push(test);
         }
         if (fileExists) {
-          console.log("+ Found test.complete file for " + filePath);
+          console.log('+ Found test.complete file for ' + filePath);
         }
         if (lambdaHasTimedOut || fileExists) {
           removeTestFromList(listOfTestsToCheckResults, test);
@@ -98,7 +99,7 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
         }
 
         debugThrottling(
-          `Available slots for next iteration: ${availableSlots}`
+          `Available slots for next iteration: ${availableSlots}`,
         );
         debugThrottling(`Total lambdas triggered: ${totalNumberOfFilesSent}`);
       }
@@ -111,8 +112,8 @@ async function pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath) {
     await wait(5000);
   }
   line();
-  debugThrottling("Lambdas which timed out: ", listOfLambdasWhichTimedOut);
-  debugThrottling("All tests send: ", allRequestIdsSent);
+  debugThrottling('Lambdas which timed out: ', listOfLambdasWhichTimedOut);
+  debugThrottling('All tests send: ', allRequestIdsSent);
   const allIdsMapped = allRequestIdsSent.map((test) => test.tlTestId);
   return { allIdsMapped, listOfLambdasWhichTimedOut };
 }

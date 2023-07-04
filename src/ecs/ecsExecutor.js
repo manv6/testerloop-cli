@@ -1,14 +1,17 @@
-const glob = require("glob");
-const { waitUntilTasksStopped } = require("@aws-sdk/client-ecs");
+const glob = require('glob');
+const { waitUntilTasksStopped } = require('@aws-sdk/client-ecs');
 
 const {
   handleResult,
   determineFilePropertiesBasedOnTags,
-} = require("../utils/handlers");
-const { getEcsEnvVariables } = require("../utils/envVariables/envVariablesHandler");
-const { sendCommandToEcs } = require("./taskProcessor");
-const { getInputData } = require("../utils/helper");
-const { getEcsClient } = require("./client");
+} = require('../utils/handlers');
+const {
+  getEcsEnvVariables,
+} = require('../utils/envVariables/envVariablesHandler');
+const { getInputData } = require('../utils/helper');
+
+const { sendCommandToEcs } = require('./taskProcessor');
+const { getEcsClient } = require('./client');
 
 async function executeEcs(runId, s3RunPath) {
   const {
@@ -26,8 +29,8 @@ async function executeEcs(runId, s3RunPath) {
   } = await getInputData();
 
   // Check if we passed one feature file or a whole folder of feature files
-  let suffix = "/*.feature";
-  if (specFilesPath.includes(".feature") === true) suffix = "";
+  let suffix = '/*.feature';
+  if (specFilesPath.includes('.feature') === true) suffix = '';
   const files = glob.sync(`${specFilesPath}${suffix}`).map((file) => `${file}`);
 
   const tasks = [];
@@ -37,7 +40,7 @@ async function executeEcs(runId, s3RunPath) {
 
   await Promise.all(
     files.map(async (file) => {
-      const filename = file.split("/").pop();
+      const filename = file.split('/').pop();
       // Determine if the file is suitable for execution based on tags
 
       const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
@@ -49,11 +52,11 @@ async function executeEcs(runId, s3RunPath) {
       if (customCommand) {
         finalCommand = `timeout 2400 ${customCommand
           .replace(/%TEST_FILE\b/g, file)
-          .replace(/%TEST_FILENAME\b/g, file.split("/").pop())}`.split(" ");
+          .replace(/%TEST_FILENAME\b/g, file.split('/').pop())}`.split(' ');
       } else {
         finalCommand =
           `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
-            " "
+            ' ',
           );
       }
       if (unWipedScenarios && (fileHasTag || tag === undefined)) {
@@ -70,33 +73,33 @@ async function executeEcs(runId, s3RunPath) {
             securityGroups,
             uploadToS3RoleArn,
             envVars,
-            ecsPublicIp
-          )
+            ecsPublicIp,
+          ),
         );
       }
       if (fileHasTag === null && tag !== undefined)
         console.log(
-          `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`
+          `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`,
         );
       if (!unWipedScenarios)
         console.log(
-          `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`
+          `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
         );
-    })
+    }),
   );
-  console.log("Executing ", pendingEcsTasks.length, " tasks:");
+  console.log('Executing ', pendingEcsTasks.length, ' tasks:');
   let counter = 0;
   for (const taskArn of await Promise.all(pendingEcsTasks)) {
     tasks.push(taskArn);
     taskDetails.push({ arn: taskArn, fileName: fileNames[counter] });
-    if (typeof taskArn !== "string") throw Error("Task ARN is not defined.");
+    if (typeof taskArn !== 'string') throw Error('Task ARN is not defined.');
     counter++;
   }
-  console.log("Task(s): ", taskDetails);
+  console.log('Task(s): ', taskDetails);
 
   if (tasks.length > 0) {
     // Wait for tasks to complete
-    console.log("Starting to poll for tasks to complete");
+    console.log('Starting to poll for tasks to complete');
     let waitECSTask;
     try {
       waitECSTask = await waitUntilTasksStopped(
@@ -106,10 +109,10 @@ async function executeEcs(runId, s3RunPath) {
           maxDelay: 10,
           minDelay: 5,
         },
-        { cluster: clusterARN, tasks }
+        { cluster: clusterARN, tasks },
       );
     } catch (err) {
-      console.log("Error waiting for the ecs tasks", err);
+      console.log('Error waiting for the ecs tasks', err);
     }
 
     console.log(`\tNumber of tasks ran: ${tasks.length}`);
@@ -117,21 +120,22 @@ async function executeEcs(runId, s3RunPath) {
     let timedOutContainers = [];
     waitECSTask.reason.tasks.forEach((task) => {
       const container = task.containers.find((container) => {
-        return container["name"] === containerName;
+        return container['name'] === containerName;
       });
       if (container.exitCode === 124)
         timedOutContainers.push(container.taskArn);
     });
     if (timedOutContainers.length > 0)
       throw new Error(
-        `Task(s) ${timedOutContainers} timed out and failed with exit code 124}`
+        `Task(s) ${timedOutContainers} timed out and failed with exit code 124}`,
       );
     // Log task names and arns
     for (let i = 0; i < taskDetails.length; i++) {
-      console.log("\n");
+      console.log('\n');
       console.log(
-        `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${taskDetails[i].arn
-        }`
+        `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${
+          taskDetails[i].arn
+        }`,
       );
     }
   }

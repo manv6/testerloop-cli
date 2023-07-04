@@ -1,31 +1,38 @@
 const glob = require('glob');
 const { waitUntilTasksStopped } = require('@aws-sdk/client-ecs');
+
 const { getInputData } = require('../utils/helper');
-const { getEcsEnvVariables } = require('../utils/envVariables/envVariablesHandler');
+const {
+  getEcsEnvVariables,
+} = require('../utils/envVariables/envVariablesHandler');
+const {
+  handleResult,
+  determineFilePropertiesBasedOnTags,
+} = require('../utils/handlers');
+
 const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
-const { handleResult, determineFilePropertiesBasedOnTags } = require('../utils/handlers');
-const { executeEcs } = require('./ecsExecutor'); 
+const { executeEcs } = require('./ecsExecutor');
 
-jest.mock('glob', () => ({sync: jest.fn()}));
+jest.mock('glob', () => ({ sync: jest.fn() }));
 jest.mock('@aws-sdk/client-ecs', () => ({
-  waitUntilTasksStopped: jest.fn()
+  waitUntilTasksStopped: jest.fn(),
 }));
 jest.mock('../utils/helper', () => ({
-  getInputData: jest.fn()
+  getInputData: jest.fn(),
 }));
 jest.mock('../utils/envVariables/envVariablesHandler', () => ({
-  getEcsEnvVariables: jest.fn()
+  getEcsEnvVariables: jest.fn(),
 }));
 jest.mock('./taskProcessor', () => ({
-  sendCommandToEcs: jest.fn()
+  sendCommandToEcs: jest.fn(),
 }));
 jest.mock('./client', () => ({
-  getEcsClient: jest.fn()
+  getEcsClient: jest.fn(),
 }));
 jest.mock('../utils/handlers', () => ({
   handleResult: jest.fn(),
-  determineFilePropertiesBasedOnTags: jest.fn()
+  determineFilePropertiesBasedOnTags: jest.fn(),
 }));
 
 describe('executeEcs', () => {
@@ -49,23 +56,40 @@ describe('executeEcs', () => {
       customCommand: 'customCommand',
       ecsPublicIp: 'ecsPublicIp',
     });
-    determineFilePropertiesBasedOnTags.mockReturnValue({ unWipedScenarios: true, fileHasTag: true });
+    determineFilePropertiesBasedOnTags.mockReturnValue({
+      unWipedScenarios: true,
+      fileHasTag: true,
+    });
     getEcsEnvVariables.mockResolvedValue(['envVar']);
     sendCommandToEcs.mockResolvedValue('taskArn');
     getEcsClient.mockResolvedValue({});
-    waitUntilTasksStopped.mockResolvedValue({ reason: { tasks: [{ containers: [{ name: 'containerName', exitCode: 0 }] }] } });
+    waitUntilTasksStopped.mockResolvedValue({
+      reason: {
+        tasks: [{ containers: [{ name: 'containerName', exitCode: 0 }] }],
+      },
+    });
 
     // Execute function
     await executeEcs('runId', 's3RunPath');
 
     // Verify that functions were called with the correct parameters
     expect(glob.sync).toHaveBeenCalledWith('./specs/*.feature');
-    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith('file1', 'tag1');
-    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith('file2', 'tag1');
+    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith(
+      'file1',
+      'tag1',
+    );
+    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith(
+      'file2',
+      'tag1',
+    );
     expect(getEcsEnvVariables).toHaveBeenCalledWith('runId');
     expect(sendCommandToEcs).toHaveBeenCalledTimes(2);
     expect(waitUntilTasksStopped).toHaveBeenCalled();
-    expect(handleResult).toHaveBeenCalledWith('s3BucketName', 's3RunPath', 'runId');
+    expect(handleResult).toHaveBeenCalledWith(
+      's3BucketName',
+      's3RunPath',
+      'runId',
+    );
   });
 
   it('should throw an error when taskArn is not a string', async () => {
@@ -84,16 +108,24 @@ describe('executeEcs', () => {
       customCommand: 'customCommand',
       ecsPublicIp: 'ecsPublicIp',
     });
-    determineFilePropertiesBasedOnTags.mockReturnValue({ unWipedScenarios: true, fileHasTag: true });
+    determineFilePropertiesBasedOnTags.mockReturnValue({
+      unWipedScenarios: true,
+      fileHasTag: true,
+    });
     getEcsEnvVariables.mockResolvedValue(['envVar']);
     sendCommandToEcs.mockResolvedValue({});
 
     // Expect function to throw an error
-    await expect(executeEcs('runId', 's3RunPath')).rejects.toThrow('Task ARN is not defined.');
+    await expect(executeEcs('runId', 's3RunPath')).rejects.toThrow(
+      'Task ARN is not defined.',
+    );
 
     // Verify that functions were called with the correct parameters
     expect(glob.sync).toHaveBeenCalledWith('./specs/*.feature');
-    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith('file1', 'tag1');
+    expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith(
+      'file1',
+      'tag1',
+    );
     expect(getEcsEnvVariables).toHaveBeenCalledWith('runId');
     expect(sendCommandToEcs).toHaveBeenCalledTimes(1);
   });

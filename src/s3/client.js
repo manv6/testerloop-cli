@@ -1,11 +1,8 @@
-const {
-  S3Client,
-} = require("@aws-sdk/client-s3");
+const { S3Client } = require('@aws-sdk/client-s3');
 
-const { getInputData } = require("../utils/helper");
+const { getInputData } = require('../utils/helper');
 
 let s3Client;
-
 
 function initializeS3Client(s3Region) {
   s3Client = new S3Client({ region: s3Region });
@@ -29,5 +26,5 @@ function clearClient() {
 
 module.exports = {
   getS3Client,
-  clearClient
-}
+  clearClient,
+};

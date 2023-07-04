@@ -1,4 +1,4 @@
-const arg = require("arg");
+const arg = require('arg');
 
 function parseArguments() {
   const args = arg({}, { permissive: true });

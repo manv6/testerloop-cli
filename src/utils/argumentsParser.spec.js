@@ -1,8 +1,8 @@
-const { parseArguments, clearTheArgs } = require("./argumentsParser");
 const arg = require('arg');
 
-jest.mock('arg');
+const { parseArguments, clearTheArgs } = require('./argumentsParser');
 
+jest.mock('arg');
 
 const args = { _: ['arg1', 'arg2', 'arg3'] };
 describe('parseArguments function', () => {
@@ -25,7 +25,9 @@ describe('clearTheArgs function', () => {
   });
 
   it('should clear specified arguments', async () => {
-    arg.mockReturnValue({ _: ['--arg1', 'value1', '--arg2', '--arg3', 'value3'] });
+    arg.mockReturnValue({
+      _: ['--arg1', 'value1', '--arg2', '--arg3', 'value3'],
+    });
 
     const argsToRemove = [
       { argName: '--arg1', hasValue: true },
@@ -40,13 +42,10 @@ describe('clearTheArgs function', () => {
   it('should not fail if argument to remove is not found', async () => {
     arg.mockReturnValue({ _: ['--arg1', 'value1', '--arg3', 'value3'] });
 
-    const argsToRemove = [
-      { argName: '--arg2', hasValue: false },
-    ];
+    const argsToRemove = [{ argName: '--arg2', hasValue: false }];
 
     const cliArgs = await clearTheArgs(argsToRemove);
 
     expect(cliArgs).toEqual(['--arg1', 'value1', '--arg3', 'value3']);
   });
 });
-

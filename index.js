@@ -1,18 +1,18 @@
 #!/usr/bin/env node
 
-const colors = require("colors");
+const colors = require('colors');
 
-const { createAndUploadCICDFileToS3Bucket } = require("./src/utils/handlers");
-const { executeEcs } = require("./src/ecs/ecsExecutor");
-const { executeLocal } = require("./src/local/localExecutor");
-const { executeLambdas } = require("./src/lambda/lambdaExecutor");
+const { createAndUploadCICDFileToS3Bucket } = require('./src/utils/handlers');
+const { executeEcs } = require('./src/ecs/ecsExecutor');
+const { executeLocal } = require('./src/local/localExecutor');
+const { executeLambdas } = require('./src/lambda/lambdaExecutor');
 const {
   getInputData,
   line,
   getNewRunId,
   getS3RunPath,
   showHelp,
-} = require("./src/utils/helper");
+} = require('./src/utils/helper');
 
 colors.enable();
 
@@ -35,17 +35,17 @@ async function main() {
     createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath);
     line();
     console.log(
-      "Your run id is: ",
-      colors.magenta(runId) + "  -> " + `${reporterBaseUrl}/run/${runId}`
+      'Your run id is: ',
+      colors.magenta(runId) + '  -> ' + `${reporterBaseUrl}/run/${runId}`,
     );
     line();
 
     // Execute
     switch (executionTypeInput) {
-      case "lambda":
+      case 'lambda':
         await executeLambdas(runId, s3RunPath);
         break;
-      case "ecs":
+      case 'ecs':
         await executeEcs(runId, s3RunPath);
         break;
       default:

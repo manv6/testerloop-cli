@@ -1,4 +1,11 @@
-const LCL = require("last-commit-log");
+const LCL = require('last-commit-log');
+const colors = require('colors');
+
+const { sendEventsToLambda } = require('../lambda/eventProcessor');
+const { syncS3TestResultsToLocal, uploadJSONToS3 } = require('../s3');
+const { debugS3, debugThrottling, debugTags } = require('../debug');
+
+const { clearTheArgs } = require('./argumentsParser');
 const {
   setExitCode,
   getExitCode,
@@ -12,26 +19,20 @@ const {
   getInputData,
   getTestStatesPerId,
   getTestResultsFromAllFilesOnlyOnceByTestName,
-} = require("./helper");
-
-const colors = require("colors");
-const { clearTheArgs } = require("./argumentsParser");
-const { sendEventsToLambda } = require("../lambda/eventProcessor");
-const { syncS3TestResultsToLocal, uploadJSONToS3 } = require("../s3");
-const { debugS3, debugThrottling, debugTags } = require("../debug");
+} = require('./helper');
 
 async function handleResult(bucket, s3RunPath, runId) {
   // Grab the files from the s3 and store them locally to get results
   const directory = `./logs/testResults/${s3RunPath.replace(
-    bucket + "/",
-    ""
+    bucket + '/',
+    '',
   )}/results`;
 
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log("Could not retrieve results from s3");
-    debugS3("ERROR fetching results from s3", err);
+    console.log('Could not retrieve results from s3');
+    debugS3('ERROR fetching results from s3', err);
     setExitCode(1);
   }
 
@@ -42,34 +43,34 @@ async function handleResult(bucket, s3RunPath, runId) {
     const { reporterBaseUrl, rerun } = await getInputData();
 
     if (rerun) {
-      console.log("Retrieving rerun results...");
+      console.log('Retrieving rerun results...');
 
       // In case of rerun on ECS/local we have the following case
       // Get all tests state from all the files in descending order from creation and make sure it only appears once
       allResultsOnce = await getTestResultsFromAllFilesOnlyOnceByTestName(
         directory,
-        "testResults-"
+        'testResults-',
       );
       failedTestResults = allResultsOnce.filter(
-        (testResult) => testResult.status === "failed"
+        (testResult) => testResult.status === 'failed',
       );
       passedTestResults = allResultsOnce.filter(
-        (testResult) => testResult.status === "passed"
+        (testResult) => testResult.status === 'passed',
       );
     } else {
-      console.log("Retrieving results...");
+      console.log('Retrieving results...');
 
       // In case of no rerun just grab the results from the local files
       failedTestResults = await getTestPerState(
         directory,
-        "testResults-",
-        "failed"
+        'testResults-',
+        'failed',
       );
 
       passedTestResults = await getTestPerState(
         directory,
-        "testResults-",
-        "passed"
+        'testResults-',
+        'passed',
       );
     }
 
@@ -83,10 +84,10 @@ async function handleResult(bucket, s3RunPath, runId) {
     }
   } catch (err) {
     console.log(
-      "There was an error trying to parse your result files. Please check your s3 and reporter configuration "
+      'There was an error trying to parse your result files. Please check your s3 and reporter configuration ',
     );
-    console.log("Error", err);
-    log("ERROR parsing result files from local folder", err);
+    console.log('Error', err);
+    log('ERROR parsing result files from local folder', err);
   }
 
   process.exit(getExitCode());
@@ -94,26 +95,26 @@ async function handleResult(bucket, s3RunPath, runId) {
 
 async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
   const directory = `./logs/testResults/${s3RunPath.replace(
-    bucket + "/",
-    ""
+    bucket + '/',
+    '',
   )}/results`;
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log("Could not retrieve results from s3");
-    debugS3("ERROR fetching results from s3", err);
+    console.log('Could not retrieve results from s3');
+    debugS3('ERROR fetching results from s3', err);
     setExitCode(1);
   }
 
   let failedTestResults = await getTestPerState(
     directory,
-    "testResults-",
-    "failed"
+    'testResults-',
+    'failed',
   );
 
   const filePaths = [];
   for (const test of failedTestResults) {
-    filePaths.push(test.pathToTest.replace("cypress/e2e/parsed/", ""));
+    filePaths.push(test.pathToTest.replace('cypress/e2e/parsed/', ''));
   }
 
   return filePaths;
@@ -122,28 +123,27 @@ async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
 async function getLambdaTestResultsFromLocalBasedOnId(
   bucket,
   listOfTestIdsToCheckResults,
-  s3RunPath
+  s3RunPath,
 ) {
   const directory = `./logs/testResults/${s3RunPath.replace(
-    bucket + "/",
-    ""
+    bucket + '/',
+    '',
   )}/results`;
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log("Could not retrieve results from s3");
-    debugThrottling("ERROR fetching results from s3", err);
+    console.log('Could not retrieve results from s3');
+    debugThrottling('ERROR fetching results from s3', err);
     setExitCode(1);
   }
 
   let results = await getTestStatesPerId(
     directory,
-    "testResults-",
-    listOfTestIdsToCheckResults
+    'testResults-',
+    listOfTestIdsToCheckResults,
   );
   return results;
 }
-
 
 function determineFilePropertiesBasedOnTags(file, tag) {
   // If tag exists then determine based on the tags
@@ -160,10 +160,10 @@ function determineFilePropertiesBasedOnTags(file, tag) {
       }
     });
     debugTags(
-      "Included and excluded tags per file",
+      'Included and excluded tags per file',
       tagsIncludedExcluded,
-      " -> ",
-      file
+      ' -> ',
+      file,
     );
     let result = [];
     tagsIncludedExcluded.excludedTags.forEach((tag) => {
@@ -180,12 +180,12 @@ function determineFilePropertiesBasedOnTags(file, tag) {
 
 async function createFinalCommand() {
   let argsToRemove = [
-    { argName: "--execute-on", hasValue: true },
-    { argName: "--rerun", hasValue: false },
+    { argName: '--execute-on', hasValue: true },
+    { argName: '--rerun', hasValue: false },
   ];
 
   let clearedArgs = await clearTheArgs(argsToRemove);
-  const finalCommand = "npx " + clearedArgs.join(" ");
+  const finalCommand = 'npx ' + clearedArgs.join(' ');
   return finalCommand;
 }
 
@@ -195,15 +195,15 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
     const commit = lcl.getLastCommitSync();
 
     let env = clearValues({ ...process.env }, [
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
+      'AWS_ACCESS_KEY_ID',
+      'AWS_SECRET_ACCESS_KEY',
     ]);
 
     let additionalEnvsForLocalExecution = {
-      GITHUB_SERVER_URL: "local",
-      GITHUB_REF_NAME: "local",
-      GITHUB_REPOSITORY: "local",
-      GITHUB_REPOSITORY_OWNER: "local",
+      GITHUB_SERVER_URL: 'local',
+      GITHUB_REF_NAME: 'local',
+      GITHUB_REPOSITORY: 'local',
+      GITHUB_REPOSITORY_OWNER: 'local',
     };
 
     env = Object.keys(additionalEnvsForLocalExecution).reduce((acc, key) => {
@@ -215,11 +215,11 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
 
     await uploadJSONToS3(s3BucketName, s3RunPath, { ...commit, ...env });
   } catch (err) {
-    console.log("ERROR: Not able to upload the cicd.json file to s3.");
+    console.log('ERROR: Not able to upload the cicd.json file to s3.');
     console.log(
-      "This can result in a breaking bebug page. Make sure your git repository is properly setup"
+      'This can result in a breaking bebug page. Make sure your git repository is properly setup',
     );
-    console.log("Error: ", err);
+    console.log('Error: ', err);
   }
 }
 
@@ -240,8 +240,8 @@ function getEnvVariableWithValues(jsonVariables) {
   if (Array.isArray(jsonVariables)) {
     console.log(
       colors.red(
-        "ERROR - 'envVariablesWithValues' in your testerlooprc.json is an array when it should be an object. \nThis can cause your tests to not work properly"
-      )
+        "ERROR - 'envVariablesWithValues' in your testerlooprc.json is an array when it should be an object. \nThis can cause your tests to not work properly",
+      ),
     );
     return [];
   }
@@ -260,17 +260,17 @@ function getEnvVariableWithValues(jsonVariables) {
 }
 
 async function handleExecutionTimeout(timeCounter) {
-  const colors = require("colors");
+  const colors = require('colors');
   colors.enable();
   const { executionTimeOutSecs } = await getInputData();
   if (timeCounter >= executionTimeOutSecs) {
     setExitCode(1);
     console.log(
       colors.red(
-        "Execution timed out after " +
-        executionTimeOutSecs +
-        " seconds. Results may vary"
-      )
+        'Execution timed out after ' +
+          executionTimeOutSecs +
+          ' seconds. Results may vary',
+      ),
     );
     return true;
   } else return false;
@@ -282,7 +282,7 @@ async function checkLambdaHasTimedOut(test, lambdaTimeOutSecs) {
     return false;
   } else {
     console.log(
-      `- Lambda '${test.tlTestId}' has timed out after ${lambdaTimeOutSecs} seconds`
+      `- Lambda '${test.tlTestId}' has timed out after ${lambdaTimeOutSecs} seconds`,
     );
     return true;
   }
@@ -307,7 +307,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
   testsSentSoFar,
   lambdaThreads,
   lambdaArn,
-  envVariables
+  envVariables,
 ) {
   let listOfFilesToSend = [];
   let tempResults = [];
@@ -328,26 +328,29 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
         numberOfTestFilesSent++;
       }
     }
-    debugThrottling("List of files to be sent on this iteration: ", listOfFilesToSend);
+    debugThrottling(
+      'List of files to be sent on this iteration: ',
+      listOfFilesToSend,
+    );
 
     tempResults = await sendEventsToLambda(
       listOfFilesToSend,
       lambdaArn,
-      envVariables
+      envVariables,
     );
 
     tempResults.forEach((result, index) => {
       console.log(
-        `--> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`
+        `--> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`,
       );
 
       let test = {
         tlTestId: JSON.stringify(result.$metadata.requestId).replaceAll(
           '"',
-          ""
+          '',
         ),
         fileName: listOfFilesToSend[index],
-        result: "running",
+        result: 'running',
         startDate: Date.now(),
       };
       requestIdsToCheck.push(test);

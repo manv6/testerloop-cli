@@ -1,8 +1,12 @@
-const { parseArguments } = require("./argumentsParser");
-const { v4 } = require("uuid");
-const { readFileSync, readFile } = require("fs");
+const { readFileSync, readFile } = require('fs');
+const path = require('path');
 
-const defaultExecutionType = "local";
+const { v4 } = require('uuid');
+const fse = require('fs-extra');
+
+const { parseArguments } = require('./argumentsParser');
+
+const defaultExecutionType = 'local';
 
 let exitCode;
 
@@ -13,9 +17,9 @@ function wait(ms = 5000) {
 }
 
 function getS3RunPath(s3BucketName, customPath, runId) {
-  return (s3BucketName + "/" + customPath + "/" + runId)
-    .replaceAll("//", "/")
-    .replaceAll("//", "/");
+  return (s3BucketName + '/' + customPath + '/' + runId)
+    .replaceAll('//', '/')
+    .replaceAll('//', '/');
 }
 
 function findArrayDifference(array1, array2) {
@@ -50,12 +54,12 @@ function setExitCode(code) {
 }
 
 function getOrgUrl(orgUrl) {
-  return orgUrl.endsWith("/") ? orgUrl.slice(0, -1) : orgUrl;
+  return orgUrl.endsWith('/') ? orgUrl.slice(0, -1) : orgUrl;
 }
 
 function line() {
   console.log(
-    "----------------------------------------------------------------------------------------------------------------------------"
+    '----------------------------------------------------------------------------------------------------------------------------',
   );
 }
 
@@ -67,10 +71,10 @@ function clearValues(object, keysArray = []) {
 }
 
 async function getInputData() {
-  const cliArgs =  parseArguments();
+  const cliArgs = parseArguments();
 
   // Load JSON data from .testerlooprc file
-  let configurationData = await readConfigurationFIle(".testerlooprc.json");
+  let configurationData = await readConfigurationFIle('.testerlooprc.json');
 
   // Override JSON data with CLI arguments
   let specFilesPath,
@@ -85,35 +89,35 @@ async function getInputData() {
 
   for (let i = 0; i < cliArgs.length; i++) {
     switch (cliArgs[i]) {
-      case "--show-results":
+      case '--show-results':
         showOnlyResultsForId = cliArgs[i + 1];
         break;
-      case "--test-spec-folder":
+      case '--test-spec-folder':
         specFilesPath = cliArgs[i + 1];
         break;
-      case "--lambdaTimeoutInSeconds":
+      case '--lambdaTimeoutInSeconds':
         lambdaTimeOutSecs = cliArgs[i + 1];
         break;
-      case "--executionTimeOutSecs":
+      case '--executionTimeOutSecs':
         executionTimeOutSecs = cliArgs[i + 1];
         break;
-      case "--execute-on":
+      case '--execute-on':
         executionTypeInput = cliArgs[i + 1];
         break;
-      case "--filter-by-tag":
+      case '--filter-by-tag':
         tag = cliArgs[i + 1];
         break;
-      case "--custom-command":
+      case '--custom-command':
         customCommand = cliArgs[i + 1];
         break;
-      case "--lambda-threads":
+      case '--lambda-threads':
         lambdaThreads = cliArgs[i + 1];
         break;
-      case "--help":
-      case "-h":
+      case '--help':
+      case '-h':
         help = true;
         break;
-      case "--rerun":
+      case '--rerun':
         rerun = true;
         break;
       default:
@@ -146,12 +150,12 @@ async function getInputData() {
     uploadFilesToS3: configurationData.reporter?.uploadFilesToS3 || true,
     s3BucketName:
       configurationData.reporter?.s3BucketName ||
-      "testerloop-default-bucket-name",
-    customPath: configurationData.reporter?.customPath || "",
+      'testerloop-default-bucket-name',
+    customPath: configurationData.reporter?.customPath || '',
     reporterBaseUrl: getOrgUrl(configurationData?.reporterBaseUrl),
-    customCommand: customCommand || "",
+    customCommand: customCommand || '',
     help: help,
-    ecsPublicIp: configurationData?.ecs.publicIp || "DISABLED",
+    ecsPublicIp: configurationData?.ecs.publicIp || 'DISABLED',
     rerun: rerun || false,
     s3Region: configurationData.reporter?.region,
     ecsRegion: configurationData.ecs?.region,
@@ -161,10 +165,8 @@ async function getInputData() {
 }
 
 function clearFeaturePath(featureFile) {
-  return featureFile.split("/").pop();
+  return featureFile.split('/').pop();
 }
-const fse = require("fs-extra");
-const path = require("path");
 
 async function getFilesSortedByMostRecent(directory, filePrefix) {
   try {
@@ -172,22 +174,22 @@ async function getFilesSortedByMostRecent(directory, filePrefix) {
     const results = files.filter((file) => file.startsWith(filePrefix));
     // Extract and convert timestamps, then sort in ascending order
     var sortedTimestamps = results
-      .map(function(result) {
-        var timestamp = result.replace(filePrefix, "").replace(".json", "");
+      .map(function (result) {
+        var timestamp = result.replace(filePrefix, '').replace('.json', '');
         return parseInt(timestamp, 10);
       })
-      .sort(function(a, b) {
+      .sort(function (a, b) {
         return b - a;
       });
     // Create a new array with sorted string items
-    var sortedItems = sortedTimestamps.map(function(timestamp) {
-      return filePrefix + timestamp + ".json";
+    var sortedItems = sortedTimestamps.map(function (timestamp) {
+      return filePrefix + timestamp + '.json';
     });
     // Output the sorted items
     return sortedItems;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
@@ -214,7 +216,7 @@ async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
     return responseArray;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
@@ -222,7 +224,7 @@ async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
 
 async function getTestResultsFromAllFilesOnlyOnceByTestName(
   directory,
-  filePrefix
+  filePrefix,
 ) {
   let responseArray = [];
   let checkedTestIds = [];
@@ -235,7 +237,7 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
         for (const contents of json) {
           const title = contents.title;
           const pathToTest = contents.pathToTest;
-          const key = pathToTest + " | " + title;
+          const key = pathToTest + ' | ' + title;
           if (!checkedTestIds.includes(key)) {
             responseArray.push(contents);
             checkedTestIds.push(key);
@@ -246,7 +248,7 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
     return responseArray;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
@@ -263,7 +265,7 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
         const json = await fse.readJSON(path.join(directory, file));
         for (const testIdToCheck of listOfTestsToCheck) {
           const filteredData = json.filter(
-            (item) => item.testId === testIdToCheck
+            (item) => item.testId === testIdToCheck,
           );
           for (const contents of filteredData) {
             responseArray.push(contents);
@@ -274,7 +276,7 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
     return responseArray;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
@@ -298,7 +300,7 @@ async function getTestPerState(directory, filePrefix, testState) {
     return responseArray;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
@@ -316,14 +318,14 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
     return responseArray;
   } catch (err) {
     console.log(
-      "!! No result files found for this execution. Check your s3 or reporter setup"
+      '!! No result files found for this execution. Check your s3 or reporter setup',
     );
     return [];
   }
 }
 
 async function createFailedLinks(runId, failedTests, orgURL) {
-  const colors = require("colors");
+  const colors = require('colors');
   colors.enable();
   for (const failed of failedTests) {
     const failedUrl = `${orgURL}/run/${runId}/test/${failed.testId}`;
@@ -384,7 +386,7 @@ function categorizeTags(inputString) {
 }
 
 function checkIfContainsTag(filename, str) {
-  const contents = readFileSync(filename, "utf-8");
+  const contents = readFileSync(filename, 'utf-8');
   const re = RegExp(`(^|\\s)${str}(\\s|$)`);
 
   return !!contents.match(re);
@@ -392,9 +394,9 @@ function checkIfContainsTag(filename, str) {
 
 function checkIfAllWiped(filename, tag) {
   // Check if every scenario is wipped
-  const contents = readFileSync(filename, "utf-8");
+  const contents = readFileSync(filename, 'utf-8');
 
-  const tagRegex = new RegExp(`${tag}`, "g");
+  const tagRegex = new RegExp(`${tag}`, 'g');
   const numOfTagged = (contents.match(tagRegex) || []).length;
 
   if (!numOfTagged) {
@@ -413,8 +415,8 @@ function checkIfAllWiped(filename, tag) {
 }
 
 async function readConfigurationFIle(file) {
-  return new Promise(function(resolve, reject) {
-    readFile(file, "utf-8", (err, data) => {
+  return new Promise(function (resolve, reject) {
+    readFile(file, 'utf-8', (err, data) => {
       if (err) {
         console.error(`Error reading ${file} file 1: ${err}`);
         return;
@@ -425,74 +427,75 @@ async function readConfigurationFIle(file) {
 }
 
 function showHelp() {
-  const colors = require("colors");
+  const colors = require('colors');
 
   console.log(
-    colors.grey("[rerun]") +
-    ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome'
+    colors.grey('[rerun]') +
+      ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome',
   );
   console.log(
-    "\t \t  --rerun: defines if there is a rerun mechanism for cypress"
+    '\t \t  --rerun: defines if there is a rerun mechanism for cypress',
   );
-  console.log("\n");
+  console.log('\n');
 
   console.log(
-    colors.blue("[local]") + " Usage  : npx tl cypress run ...cypress_options "
+    colors.blue('[local]') + ' Usage  : npx tl cypress run ...cypress_options ',
   );
   console.log(
-    colors.blue("[local]") +
-    " Example: npx tl cypress run --spec e2e/login.feature --browser chrome --headless"
+    colors.blue('[local]') +
+      ' Example: npx tl cypress run --spec e2e/login.feature --browser chrome --headless',
   );
-  console.log(colors.blue("[local]") + " Params : Any cypress parameters");
-  console.log("\n");
+  console.log(colors.blue('[local]') + ' Params : Any cypress parameters');
+  console.log('\n');
 
   console.log(
-    colors.magenta("[lambda]") +
-    " Usage  : npx tl --execute-on ecs ...ecs_options "
+    colors.magenta('[lambda]') +
+      ' Usage  : npx tl --execute-on ecs ...ecs_options ',
   );
   console.log(
-    colors.magenta("[lambda]") +
-    " Example: npx tl --execute-on lambda --spec e2e/login.feature --tag @mytag"
+    colors.magenta('[lambda]') +
+      ' Example: npx tl --execute-on lambda --spec e2e/login.feature --tag @mytag',
   );
   console.log(
-    colors.magenta("[lambda]") +
-    " Params : Lambda execution accepts the following:"
+    colors.magenta('[lambda]') +
+      ' Params : Lambda execution accepts the following:',
   );
-  console.log("\t \t  --execute-on: defines where to execute the tests");
+  console.log('\t \t  --execute-on: defines where to execute the tests');
   console.log(
-    "\t \t  --spec:       select a folder of tests or a specific test"
+    '\t \t  --spec:       select a folder of tests or a specific test',
   );
 
   console.log(
-    "\t \t  --lambdaTimeoutInSeconds: The amount of time in seconds to wait for the lambdas to complete"
+    '\t \t  --lambdaTimeoutInSeconds: The amount of time in seconds to wait for the lambdas to complete',
   );
-  console.log("\n");
+  console.log('\n');
 
   console.log(
-    colors.yellow("[ecs]") + " Usage  : npx tl --execute-on ecs ...ecs_options "
+    colors.yellow('[ecs]') +
+      ' Usage  : npx tl --execute-on ecs ...ecs_options ',
   );
   console.log(
-    colors.yellow("[ecs]") +
-    " Example: npx tl --execute-on ecs --spec e2e/login.feature --tag @mytag"
+    colors.yellow('[ecs]') +
+      ' Example: npx tl --execute-on ecs --spec e2e/login.feature --tag @mytag',
   );
   console.log(
-    colors.yellow("[ecs]") + " Params : Ecs execution accepts the following:"
+    colors.yellow('[ecs]') + ' Params : Ecs execution accepts the following:',
   );
-  console.log("\t \t  --execute-on: defines where to execute the tests");
+  console.log('\t \t  --execute-on: defines where to execute the tests');
   console.log(
-    "\t \t  --test-spec-folder:       select a folder of tests or a specific test"
-  );
-  console.log(
-    "\t \t  --filter-by-tag:        filter the feature files based on specific tags"
+    '\t \t  --test-spec-folder:       select a folder of tests or a specific test',
   );
   console.log(
-    "\t \t  --custom-command: Send a custom command to an ecs task. example ( --custom-command 'npx cucumber-cypress-rerun --spec %TEST_FILE --browser chrome' ) "
+    '\t \t  --filter-by-tag:        filter the feature files based on specific tags',
   );
   console.log(
-    "\t \t \t  %TEST_FILE: Each test file found from the spec is exposed as %TEST_FILE with full path to the file"
+    "\t \t  --custom-command: Send a custom command to an ecs task. example ( --custom-command 'npx cucumber-cypress-rerun --spec %TEST_FILE --browser chrome' ) ",
   );
   console.log(
-    "\t \t \t  %TEST_FILENAME: Each test file found from the spec is exposed as %TEST_FILE with full path to the file"
+    '\t \t \t  %TEST_FILE: Each test file found from the spec is exposed as %TEST_FILE with full path to the file',
+  );
+  console.log(
+    '\t \t \t  %TEST_FILENAME: Each test file found from the spec is exposed as %TEST_FILE with full path to the file',
   );
 }
 
@@ -524,5 +527,5 @@ module.exports = {
   getInputData,
   extractTags,
   getNonCommonElements,
-  getOrgUrl
+  getOrgUrl,
 };

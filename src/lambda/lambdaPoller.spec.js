@@ -1,7 +1,13 @@
 const { getInputData, wait, line } = require('../utils/helper');
-const { sendTestsToLambdasBasedOnAvailableSlots, removeTestFromList, handleExecutionTimeout, checkLambdaHasTimedOut } = require('../utils/handlers');
+const {
+  sendTestsToLambdasBasedOnAvailableSlots,
+  removeTestFromList,
+  handleExecutionTimeout,
+  checkLambdaHasTimedOut,
+} = require('../utils/handlers');
 const { checkFileExistsInS3 } = require('../s3');
 const { debugThrottling } = require('../debug');
+
 const { pollLambdasWithThrottling } = require('./lambdaPoller'); // replace with your actual module path
 
 jest.mock('../utils/helper');
@@ -37,7 +43,8 @@ describe('pollLambdasWithThrottling', () => {
     const envVars = {};
     const s3RunPath = 's3path';
 
-    const { allIdsMapped, listOfLambdasWhichTimedOut } = await pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath);
+    const { allIdsMapped, listOfLambdasWhichTimedOut } =
+      await pollLambdasWithThrottling(allFilesToBeSent, envVars, s3RunPath);
 
     expect(allIdsMapped).toEqual([]);
     expect(listOfLambdasWhichTimedOut).toEqual([]);
@@ -45,4 +52,3 @@ describe('pollLambdasWithThrottling', () => {
 
   // Add more test cases for different paths through the function based on different mocked return values
 });
-

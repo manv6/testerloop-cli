@@ -1,9 +1,9 @@
-const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
+const { ECSClient, RunTaskCommand } = require('@aws-sdk/client-ecs');
 
-const { getEcsClient } = require("./client");
+const { getEcsClient } = require('./client');
 
-const launchType = "FARGATE";
-let assignPublicIp = "DISABLED";
+const launchType = 'FARGATE';
+let assignPublicIp = 'DISABLED';
 
 async function sendCommandToEcs(
   containerName,
@@ -14,12 +14,14 @@ async function sendCommandToEcs(
   securityGroups,
   uploadToS3RoleArn,
   envVariableList,
-  ecsPublicIp
+  ecsPublicIp,
 ) {
   return new Promise(async (resolve, reject) => {
     try {
       assignPublicIp =
-        ecsPublicIp === "ENABLED" ? (assignPublicIp = "ENABLED") : assignPublicIp;
+        ecsPublicIp === 'ENABLED'
+          ? (assignPublicIp = 'ENABLED')
+          : assignPublicIp;
       const overrides = [{ name: containerName, command: runCommand }];
       overrides[0].environment = envVariableList;
 
@@ -42,7 +44,7 @@ async function sendCommandToEcs(
       const ecsTask = await (await getEcsClient()).send(runTaskCommand);
       const { taskArn } = ecsTask.tasks[0];
       resolve(taskArn);
-    } catch(e) {
+    } catch (e) {
       reject(e);
     }
   });

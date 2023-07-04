@@ -1,7 +1,9 @@
-const { executeLocal } = require('./localExecutor');
 const { spawn } = require('child_process');
+
 const { getInputData } = require('../utils/helper');
 const { handleResult, createFinalCommand } = require('../utils/handlers');
+
+const { executeLocal } = require('./localExecutor');
 
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
@@ -12,7 +14,7 @@ jest.mock('../utils/handlers', () => ({
   createFinalCommand: jest.fn(),
 }));
 jest.mock('../utils/helper', () => ({
-  getInputData: jest.fn()
+  getInputData: jest.fn(),
 }));
 
 describe('executeLocal function', () => {
@@ -48,7 +50,7 @@ describe('executeLocal function', () => {
 
     expect(spawn).toHaveBeenCalledWith(
       'CYPRESS_TL_RUN_ID=runId1 CYPRESS_TL_S3_BUCKET_NAME=bucket1 CYPRESS_TL_EXECUTE_FROM=local CYPRESS_TL_CUSTOM_RESULTS_PATH=/path CYPRESS_TL_UPLOAD_RESULTS_TO_S3=true CYPRESS_TL_S3_REGION=region1 final command',
-      { shell: true, stdio: 'inherit' }
+      { shell: true, stdio: 'inherit' },
     );
   });
 
@@ -82,10 +84,13 @@ describe('executeLocal function', () => {
 
       // Ensure handleResult has been called
       setImmediate(() => {
-        expect(handleResult).toHaveBeenCalledWith('bucket1', 's3RunPath1', 'runId1');
+        expect(handleResult).toHaveBeenCalledWith(
+          'bucket1',
+          's3RunPath1',
+          'runId1',
+        );
         done();
       });
     });
   });
 });
-
