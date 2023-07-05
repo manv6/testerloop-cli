@@ -84,6 +84,7 @@ async function getInputData() {
     customCommand,
     lambdaThreads,
     showOnlyResultsForId,
+    executionTimeOutSecs,
     help,
     rerun;
 
@@ -430,15 +431,6 @@ function showHelp() {
   const colors = require('colors');
 
   console.log(
-    colors.grey('[rerun]') +
-      ' Usage  : npx tl --rerun cucumber-cypress-rerun --feature-files cypress/e2e --env TAGS=\\"@overloop\\" --browser chrome',
-  );
-  console.log(
-    '\t \t  --rerun: defines if there is a rerun mechanism for cypress',
-  );
-  console.log('\n');
-
-  console.log(
     colors.blue('[local]') + ' Usage  : npx tl cypress run ...cypress_options ',
   );
   console.log(
@@ -450,52 +442,68 @@ function showHelp() {
 
   console.log(
     colors.magenta('[lambda]') +
-      ' Usage  : npx tl --execute-on ecs ...ecs_options ',
+      ' Usage  : npx tl --execute-on lambda ...lambda_params ',
   );
   console.log(
     colors.magenta('[lambda]') +
-      ' Example: npx tl --execute-on lambda --spec e2e/login.feature --tag @mytag',
+      ' Example: npx tl --execute-on lambda --test-spec-folder e2e/login --filter-by-tag @mytag',
   );
   console.log(
     colors.magenta('[lambda]') +
       ' Params : Lambda execution accepts the following:',
   );
-  console.log('\t \t  --execute-on: defines where to execute the tests');
   console.log(
-    '\t \t  --spec:       select a folder of tests or a specific test',
+    '\t \t  --execute-on:             Defines where to execute the tests',
   );
 
   console.log(
-    '\t \t  --lambdaTimeoutInSeconds: The amount of time in seconds to wait for the lambdas to complete',
+    '\t \t  --test-spec-folder:       Select a folder of tests.Will iterate over all subfolders',
+  );
+  console.log(
+    "\t \t  --filter-by-tag:          Filter the feature files based on specific tags. They can be inclusive or exclusive (example: '@include and not @exclude')",
+  );
+  console.log(
+    '\t \t  --lambda-threads:         Throttles the number of lambdas to run in parallel',
+  );
+  console.log(
+    '\t \t  --rerun:                  Will rerun the failed or timed out tests',
+  );
+  console.log(
+    '\t \t  --lambdaTimeoutInSeconds: The amount of time in seconds to wait for each lambda to complete',
+  );
+  console.log(
+    '\t \t  --executionTimeOutSecs:   The amount of time in seconds to wait for the whole execution to complete',
   );
   console.log('\n');
 
   console.log(
-    colors.yellow('[ecs]') +
-      ' Usage  : npx tl --execute-on ecs ...ecs_options ',
+    colors.yellow('[ecs]') + ' Usage  : npx tl --execute-on ecs ...ecs_params ',
   );
   console.log(
     colors.yellow('[ecs]') +
-      ' Example: npx tl --execute-on ecs --spec e2e/login.feature --tag @mytag',
+      ' Example: npx tl --execute-on ecs --test-spec-folder e2e/login --filter-by-tag @mytag',
   );
   console.log(
     colors.yellow('[ecs]') + ' Params : Ecs execution accepts the following:',
   );
   console.log('\t \t  --execute-on: defines where to execute the tests');
   console.log(
-    '\t \t  --test-spec-folder:       select a folder of tests or a specific test',
+    '\t \t  --test-spec-folder:       Select a folder of tests or a specific test file',
   );
   console.log(
-    '\t \t  --filter-by-tag:        filter the feature files based on specific tags',
+    "\t \t  --filter-by-tag:          Filter the feature files based on specific tags. They can be inclusive or exclusive (example: '@include and not @exclude')",
   );
   console.log(
-    "\t \t  --custom-command: Send a custom command to an ecs task. example ( --custom-command 'npx cucumber-cypress-rerun --spec %TEST_FILE --browser chrome' ) ",
+    "\t \t  --custom-command:         Send a custom command to an ecs task. example ( --custom-command 'npx cucumber-cypress-rerun --spec %TEST_FILE --browser chrome' ) ",
   );
   console.log(
-    '\t \t \t  %TEST_FILE: Each test file found from the spec is exposed as %TEST_FILE with full path to the file',
+    '\t \t  --rerun:                  Will rerun the failed or timed out tests',
   );
   console.log(
-    '\t \t \t  %TEST_FILENAME: Each test file found from the spec is exposed as %TEST_FILE with full path to the file',
+    '\t \t     %TEST_FILE:            Each test file found from the --filter-by-tag is exposed as %TEST_FILE with full path to the file',
+  );
+  console.log(
+    '\t \t     %TEST_FILENAME:        Each test file found from the --filter-by-tag is exposed as %TEST_FILE with full path to the file',
   );
 }
 
