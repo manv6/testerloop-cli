@@ -9,8 +9,6 @@ function parseArguments() {
 
 async function clearTheArgs(argsToRemoveArray) {
   const args = arg({}, { permissive: true });
-
-  console.log('args', args);
   const getArgs = async () => {
     return args._;
   };

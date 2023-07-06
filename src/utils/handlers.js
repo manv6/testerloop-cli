@@ -39,6 +39,8 @@ async function handleResult(bucket, s3RunPath, runId) {
   try {
     let failedTestResults;
     let passedTestResults;
+    let filteredFailedTests;
+    let filteredPassedTests;
     let allResultsOnce = [];
     const { reporterBaseUrl, rerun } = await getInputData();
 
@@ -57,17 +59,25 @@ async function handleResult(bucket, s3RunPath, runId) {
       passedTestResults = allResultsOnce.filter(
         (testResult) => testResult.status === 'passed',
       );
+      // If there are passed and failed tests that means the passed tests were on the second run and thus we don't want to create links for them
+      filteredPassedTests = passedTestResults.map(
+        (test) => test.pathToTest + '|' + test.title,
+      );
+      filteredFailedTests = failedTestResults.filter(
+        (test) =>
+          !filteredPassedTests.includes(test.pathToTest + '|' + test.title),
+      );
     } else {
       console.log('Retrieving results...');
 
       // In case of no rerun just grab the results from the local files
-      failedTestResults = await getTestPerState(
+      filteredFailedTests = await getTestPerState(
         directory,
         'testResults-',
         'failed',
       );
 
-      passedTestResults = await getTestPerState(
+      filteredPassedTests = await getTestPerState(
         directory,
         'testResults-',
         'passed',
@@ -76,18 +86,18 @@ async function handleResult(bucket, s3RunPath, runId) {
 
     await createRunLinks(reporterBaseUrl, runId);
 
-    if (failedTestResults.length > 0) {
-      await createFailedLinks(runId, failedTestResults, reporterBaseUrl);
+    if (filteredFailedTests.length > 0) {
+      await createFailedLinks(runId, filteredFailedTests, reporterBaseUrl);
       setExitCode(1);
     } else {
       setExitCode(0);
+      console.log('Good job! No failed tests found!');
     }
   } catch (err) {
     console.log(
       'There was an error trying to parse your result files. Please check your s3 and reporter configuration ',
     );
     console.log('Error', err);
-    log('ERROR parsing result files from local folder', err);
   }
 
   process.exit(getExitCode());

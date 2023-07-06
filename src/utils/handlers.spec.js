@@ -67,12 +67,33 @@ describe('handlers', () => {
       const expectedExitCode = 1;
 
       const getTestPerStateMock = jest.fn().mockResolvedValue([
-        { testId: 1, status: 'passed' },
-        { testId: 2, status: 'failed' },
-        { testId: 3, status: 'passed' },
+        {
+          testId: 1,
+          status: 'passed',
+          title: 'testTitle',
+          pathToTest: 'testPath',
+        },
+        {
+          testId: 2,
+          status: 'failed',
+          title: 'testTitle',
+          pathToTest: 'testPath',
+        },
+        {
+          testId: 3,
+          status: 'passed',
+          title: 'testTitle',
+          pathToTest: 'testPath',
+        },
       ]);
       const failedTestResults = [
-        { testId: 2, status: 'failed', data: 'test2-failed' },
+        {
+          testId: 2,
+          status: 'failed',
+          data: 'test2-failed',
+          title: 'testTitle2',
+          pathToTest: 'testPath',
+        },
       ];
 
       jest
@@ -88,9 +109,27 @@ describe('handlers', () => {
       jest
         .spyOn(helper, 'getTestResultsFromAllFilesOnlyOnceByTestName')
         .mockResolvedValue([
-          { testId: 1, status: 'passed', data: 'test-passed-1' },
-          { testId: 2, status: 'failed', data: 'test2-failed' },
-          { testId: 3, status: 'passed', data: 'test-passed-2' },
+          {
+            testId: 1,
+            status: 'passed',
+            data: 'test-passed-1',
+            title: 'testTitle1',
+            pathToTest: 'testPath',
+          },
+          {
+            testId: 2,
+            status: 'failed',
+            data: 'test2-failed',
+            title: 'testTitle2',
+            pathToTest: 'testPath',
+          },
+          {
+            testId: 3,
+            status: 'passed',
+            data: 'test-passed-2',
+            title: 'testTitle3',
+            pathToTest: 'testPath',
+          },
         ]);
       const processExitSpy = jest
         .spyOn(process, 'exit')
