@@ -6,9 +6,13 @@ const {
   uploadJSONToS3,
   checkFileExistsInS3,
 } = require('../s3'); // change to your actual module path
+const logger = require('../logger/logger');
 
 const { getS3Client } = require('./client');
 
+jest.mock('../logger/logger', () => {
+  return { getLogger: jest.fn() };
+});
 jest.mock('@aws-sdk/client-s3', () => ({
   PutObjectCommand: jest.fn(),
   HeadObjectCommand: jest.fn(),
@@ -17,6 +21,11 @@ jest.mock('s3-sync-client');
 jest.mock('./client');
 
 describe('S3 operations', () => {
+  beforeEach(() => {
+    jest
+      .spyOn(logger, 'getLogger')
+      .mockReturnValue({ error: jest.fn(), debug: jest.fn(), info: jest.fn() });
+  });
   afterEach(() => {
     jest.resetAllMocks();
   });

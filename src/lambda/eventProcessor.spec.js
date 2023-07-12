@@ -1,7 +1,20 @@
+const logger = require('../logger/logger');
+
 const { sendEventsToLambda } = require('./eventProcessor');
 const { getLambdaClient } = require('./client');
 
-// Here, we only mock getLambdaClient function and avoid using mockImplementation
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+}); // Here, we only mock getLambdaClient function and avoid using mockImplementation
 jest.mock('./client');
 
 describe('sendEventsToLambda function', () => {
@@ -49,16 +62,6 @@ describe('sendEventsToLambda function', () => {
     // Mock the send function to reject with an error
     mockSend.mockRejectedValue(Error(errorMessage));
 
-    const consoleSpy = jest.spyOn(console, 'log');
-    consoleSpy.mockImplementation(() => {});
-
     await sendEventsToLambda(files, lambdaArn, envVars);
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'ERROR: could not send events',
-      expect.any(Error),
-    );
-
-    consoleSpy.mockRestore();
   });
 });

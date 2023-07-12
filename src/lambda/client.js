@@ -1,14 +1,17 @@
 const { LambdaClient } = require('@aws-sdk/client-lambda');
 
 const { getInputData } = require('../utils/helper');
+const { getLogger } = require('../logger/logger');
 
 let client;
 
 function initializeLambdaClient(lambdaRegion) {
+  const logger = getLogger();
+  logger.info('Initializing lambda client');
   client = new LambdaClient({
     region: lambdaRegion,
   });
-
+  logger.info('Lambda client initialized successfully', { client });
   return client;
 }
 

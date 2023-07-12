@@ -1,5 +1,7 @@
 const { ECSClient, RunTaskCommand } = require('@aws-sdk/client-ecs');
 
+const { getLogger } = require('../logger/logger');
+
 const { getEcsClient } = require('./client');
 
 const launchType = 'FARGATE';
@@ -17,6 +19,7 @@ async function sendCommandToEcs(
   ecsPublicIp,
 ) {
   return new Promise(async (resolve, reject) => {
+    const logger = getLogger();
     try {
       assignPublicIp =
         ecsPublicIp === 'ENABLED'
@@ -45,6 +48,8 @@ async function sendCommandToEcs(
       const { taskArn } = ecsTask.tasks[0];
       resolve(taskArn);
     } catch (e) {
+      logger.error('Error executing ecs task', { e });
+      logger.debug('Error executing ecs task', e);
       reject(e);
     }
   });

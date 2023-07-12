@@ -1,9 +1,12 @@
 const { PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const S3SyncClient = require('s3-sync-client');
 
+const { getLogger } = require('../logger/logger');
+
 const { getS3Client } = require('./client');
 
 async function syncFilesFromS3(s3Path, localPath, retryCount = 0) {
+  const logger = getLogger();
   const { sync } = new S3SyncClient({ client: await getS3Client() });
 
   const retryDelay = 1000; // Retry delay in milliseconds
@@ -12,23 +15,27 @@ async function syncFilesFromS3(s3Path, localPath, retryCount = 0) {
   return new Promise(async (resolve, reject) => {
     const syncFiles = async () => {
       try {
-        console.log(
+        logger.info(
           `Begin syncing log files from s3 to local path '${localPath}'`,
         );
         await sync(s3Path, localPath);
-        console.log(`Finish syncing s3 folder to local path`);
+        logger.info(`Finish syncing s3 folder to local path`);
         resolve();
       } catch (error) {
-        console.log(
+        logger.error(
           `Failed to sync files from s3 to local path '${localPath}'`,
+          { error },
         );
-
+        logger.debug(
+          `Failed to sync files from s3 to local path '${localPath}'`,
+          error,
+        );
         if (retryCount < maxRetries) {
-          console.log(`Retrying (${retryCount + 1}/${maxRetries})...`);
+          logger.info(`Retrying (${retryCount + 1}/${maxRetries})...`);
           setTimeout(syncFiles, retryDelay);
           retryCount++;
         } else {
-          console.log(`Maximum retries reached. Aborting sync.`);
+          logger.info(`Maximum retries reached. Aborting sync.`);
           reject(new Error('Maximum retries reached')); // Reject the promise when maximum retries are reached
         }
       }
@@ -39,17 +46,19 @@ async function syncFilesFromS3(s3Path, localPath, retryCount = 0) {
 }
 
 async function uploadFileToS3(bucket, key, body) {
+  const logger = getLogger();
   const params = {
     Bucket: bucket,
     Key: key,
     Body: body,
   };
   try {
-    console.log(`Begin uploading file '${key}'`);
+    logger.info(`Begin uploading file '${key}' to s3`, { bucket, key, body });
     await (await getS3Client()).send(new PutObjectCommand(params));
-    console.log(`+ Finished uploading file '${key}' to bucket '${bucket}'`);
+    logger.info(`Finished uploading file '${key}' to bucket '${bucket}'`);
   } catch (error) {
-    console.log('Failed to upload files', error);
+    logger.error('Failed to upload files', { error });
+    logger.debug('Failed to upload files', error);
   }
 }
 
@@ -63,9 +72,7 @@ async function checkFileExistsInS3(bucketName, key) {
     if (response) {
       return true;
     }
-  } catch (err) {
-    // console.log(`Waiting for file ${key} to be uploaded`);
-  }
+  } catch (err) {}
 }
 
 async function syncS3TestResultsToLocal(

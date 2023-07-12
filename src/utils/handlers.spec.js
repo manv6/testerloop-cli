@@ -1,6 +1,6 @@
 const eventProcessor = require('../lambda/eventProcessor');
 const s3 = require('../s3');
-const debug = require('../debug');
+const logger = require('../logger/logger');
 
 const {
   handleResult,
@@ -18,7 +18,7 @@ const {
 const { clearTheArgs } = require('./argumentsParser');
 const argumentsParser = require('./argumentsParser');
 const helper = require('./helper');
-
+const exitCode = require('./exitCode');
 const bucketName = 'bucketName';
 const runId = 'e2c9ad1b-e6e1-403f-995b-b525dc461c0f';
 const orgUrl = 'https://org.com';
@@ -29,13 +29,24 @@ jest.mock('../debug', () => ({
   debugThrottling: jest.fn(),
   debugTags: jest.fn(),
 }));
+jest.mock('../s3');
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 
 jest.mock('./helper', () => ({
   getTestPerState: jest.fn(),
   createRunLinks: jest.fn(),
   createFailedLinks: jest.fn(),
-  setExitCode: jest.fn(),
-  getExitCode: jest.fn(),
   syncS3TestResultsToLocal: jest.fn(),
   getTestResultsFromAllFilesOnlyOnceByTestName: jest.fn(),
   getInputData: jest.fn(),
@@ -44,6 +55,11 @@ jest.mock('./helper', () => ({
   checkIfContainsTag: jest.fn(),
   checkIfAllWiped: jest.fn(),
 }));
+
+jest.mock('./exitCode', () => ({
+  setExitCode: jest.fn(),
+  getExitCode: jest.fn(),
+}));
 jest.mock('../lambda/eventProcessor', () => ({
   sendEventsToLambda: jest.fn(),
 }));
@@ -51,7 +67,6 @@ jest.mock('../lambda/eventProcessor', () => ({
 jest.mock('./argumentsParser', () => ({
   clearTheArgs: jest.fn(),
 }));
-jest.mock('../s3');
 
 describe('handlers', () => {
   describe('handleResult', () => {
@@ -60,7 +75,7 @@ describe('handlers', () => {
     });
 
     test('should handle results for rerun and process exit code with failed tests', async () => {
-      helper.getInputData.mockReturnValue({
+      helper.getInputData.mockResolvedValue({
         reporterBaseUrl: orgUrl,
         rerun: true,
       });
@@ -101,9 +116,8 @@ describe('handlers', () => {
         .mockResolvedValue(`${orgUrl}/${runId}`);
 
       jest.spyOn(helper, 'createFailedLinks').mockResolvedValue([]);
-      jest.spyOn(helper, 'getExitCode').mockReturnValue(expectedExitCode);
-
-      helper.setExitCode.mockReturnValue(expectedExitCode);
+      jest.spyOn(exitCode, 'getExitCode').mockReturnValue(expectedExitCode);
+      exitCode.setExitCode.mockReturnValue(expectedExitCode);
 
       jest.spyOn(s3, 'syncS3TestResultsToLocal').mockResolvedValue([]);
       jest
@@ -131,9 +145,6 @@ describe('handlers', () => {
             pathToTest: 'testPath',
           },
         ]);
-      const processExitSpy = jest
-        .spyOn(process, 'exit')
-        .mockImplementation(() => {});
 
       await handleResult(bucketName, s3RunPath, runId);
 
@@ -152,9 +163,9 @@ describe('handlers', () => {
         failedTestResults,
         orgUrl,
       );
-      expect(helper.setExitCode).toHaveBeenCalledWith(expectedExitCode);
-      expect(helper.getExitCode).toHaveBeenCalled();
-      expect(processExitSpy).toHaveBeenCalledWith(expectedExitCode);
+
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(expectedExitCode);
+      expect(logger.endLogStream).toHaveBeenCalledWith();
     });
 
     test('should handle results for rerun and process exit code with passed tests', async () => {
@@ -170,8 +181,7 @@ describe('handlers', () => {
         .mockResolvedValue(`${orgUrl}/${runId}`);
 
       jest.spyOn(helper, 'createFailedLinks').mockResolvedValue([]);
-      jest.spyOn(helper, 'getExitCode').mockReturnValue(expectedExitCode);
-      jest.spyOn(helper, 'setExitCode').mockReturnValue(expectedExitCode);
+      jest.spyOn(exitCode, 'setExitCode').mockReturnValue(expectedExitCode);
 
       jest.spyOn(s3, 'syncS3TestResultsToLocal').mockResolvedValue([]);
       jest
@@ -186,10 +196,6 @@ describe('handlers', () => {
         { testId: 2, status: 'passed' },
         { testId: 3, status: 'passed' },
       ]);
-
-      const processExitSpy = jest
-        .spyOn(process, 'exit')
-        .mockImplementation(() => {});
 
       await handleResult(bucketName, s3RunPath, runId);
 
@@ -207,9 +213,7 @@ describe('handlers', () => {
         failedTestResults,
         orgUrl,
       );
-      expect(helper.setExitCode).toHaveBeenCalledWith(expectedExitCode);
-      expect(helper.getExitCode).toHaveBeenCalled();
-      expect(processExitSpy).toHaveBeenCalledWith(expectedExitCode);
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(expectedExitCode);
     });
 
     test('should handle results for single run and process exit code with failed tests', async () => {
@@ -229,14 +233,9 @@ describe('handlers', () => {
         rerun: false,
       });
 
-      jest.spyOn(helper, 'getExitCode').mockReturnValue(expectedExitCode);
-      jest.spyOn(helper, 'setExitCode').mockReturnValue(expectedExitCode);
+      jest.spyOn(exitCode, 'setExitCode').mockReturnValue(expectedExitCode);
       jest.spyOn(s3, 'syncS3TestResultsToLocal').mockResolvedValue([]);
       helper.getTestPerState.mockResolvedValueOnce(failedTestResults);
-
-      const processExitSpy = jest
-        .spyOn(process, 'exit')
-        .mockImplementation(() => {});
 
       await handleResult(bucketName, s3RunPath, runId);
 
@@ -257,9 +256,7 @@ describe('handlers', () => {
         failedTestResults,
         orgUrl,
       );
-      expect(helper.setExitCode).toHaveBeenCalledWith(expectedExitCode);
-      expect(helper.getExitCode).toHaveBeenCalled();
-      expect(processExitSpy).toHaveBeenCalledWith(expectedExitCode);
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(expectedExitCode);
     });
 
     test('should handle results for single run and process exit code with passed tests', async () => {
@@ -283,16 +280,12 @@ describe('handlers', () => {
         rerun: false,
       });
 
-      jest.spyOn(helper, 'getExitCode').mockReturnValue(expectedExitCode);
-      jest.spyOn(helper, 'setExitCode').mockReturnValue(expectedExitCode);
+      jest.spyOn(exitCode, 'getExitCode').mockReturnValue(expectedExitCode);
+      jest.spyOn(exitCode, 'setExitCode').mockReturnValue(expectedExitCode);
       jest.spyOn(s3, 'syncS3TestResultsToLocal').mockResolvedValue([]);
       helper.getTestPerState
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce(passedTestResults);
-
-      const processExitSpy = jest
-        .spyOn(process, 'exit')
-        .mockImplementation(() => {});
 
       await handleResult(bucketName, s3RunPath, runId);
 
@@ -312,9 +305,7 @@ describe('handlers', () => {
         failedTestResults,
         orgUrl,
       );
-      expect(helper.setExitCode).toHaveBeenCalledWith(expectedExitCode);
-      expect(helper.getExitCode).toHaveBeenCalled();
-      expect(processExitSpy).toHaveBeenCalledWith(expectedExitCode);
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(expectedExitCode);
     });
   });
 
@@ -356,11 +347,9 @@ describe('handlers', () => {
   });
 
   describe('handleExecutionTimeout', () => {
-    // @TODO  check with Damian
     test('should return true if timeCounter is greater than or equal to executionTimeOutSecs, and set exit code to 1', async () => {
       const timeCounter = 10; // this value can be changed for testing
       const executionTimeOutSecs = 5; // this value can be changed for testing
-      const spy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
       helper.getInputData.mockReturnValue({
         executionTimeOutSecs: executionTimeOutSecs,
@@ -368,11 +357,7 @@ describe('handlers', () => {
 
       const result = await handleExecutionTimeout(timeCounter);
       expect(result).toBe(true);
-      expect(spy).toHaveBeenCalledWith(
-        expect.stringContaining('Execution timed out after'),
-      );
-      expect(helper.setExitCode).toHaveBeenCalledWith(1);
-      spy.mockRestore();
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(1);
     });
 
     test('should return false if timeCounter is less than executionTimeOutSecs, and exit code should not be set', async () => {
@@ -651,10 +636,6 @@ describe('handlers', () => {
         new Error('Failed to fetch data from s3'),
       );
 
-      jest
-        .spyOn(console, 'log')
-        .mockResolvedValue('Could not retrieve results from s3');
-
       await getLambdaTestResultsFromLocalBasedOnId(
         bucket,
         listOfTestIdsToCheckResults,
@@ -662,14 +643,7 @@ describe('handlers', () => {
       );
 
       expect(s3.syncS3TestResultsToLocal).toHaveBeenCalledWith(s3RunPath);
-      expect(console.log).toHaveBeenCalledWith(
-        'Could not retrieve results from s3',
-      );
-      expect(debug.debugThrottling).toHaveBeenCalledWith(
-        'ERROR fetching results from s3',
-        Error('Failed to fetch data from s3'),
-      );
-      expect(helper.setExitCode).toHaveBeenCalledWith(1);
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(1);
     });
   });
 
@@ -683,8 +657,7 @@ describe('handlers', () => {
         { pathToTest: 'cypress/e2e/parsed/failing_test1.js' },
         { pathToTest: 'cypress/e2e/parsed/failing_test2.js' },
       ];
-      // jest.spyOn(global, "setExitCode").mockImplementation(() => {});
-      helper.setExitCode.mockReturnValue();
+      exitCode.setExitCode.mockReturnValue();
       s3.syncS3TestResultsToLocal.mockResolvedValueOnce(s3RunPath);
       jest.spyOn(console, 'log').mockImplementation(() => {});
       helper.getTestPerState.mockResolvedValueOnce(failedTestResults);
@@ -695,28 +668,28 @@ describe('handlers', () => {
       );
 
       expect(result).toEqual(['failing_test1.js', 'failing_test2.js']);
-      expect(helper.setExitCode).not.toHaveBeenCalled();
+      expect(exitCode.setExitCode).not.toHaveBeenCalled();
       expect(console.log).not.toHaveBeenCalledWith(
         'Could not retrieve results from s3',
       );
     });
 
-    // @TODO check the debug mock
     test('should set exit code to 1 and log an error message if unable to fetch results from s3', async () => {
       const bucketName = 'bucketName';
 
       helper.getTestPerState.mockResolvedValueOnce([]);
-      jest.spyOn(console, 'log').mockImplementation(() => {});
+      // @TODO same
+      // jest.spyOn(console, 'log').mockImplementation(() => {});
       s3.syncS3TestResultsToLocal.mockRejectedValueOnce(
         new Error('Unable to fetch results'),
       );
 
       await getFailedLambdaTestResultsFromLocal(bucketName, s3RunPath);
 
-      expect(helper.setExitCode).toHaveBeenCalledWith(1);
-      expect(console.log).toHaveBeenCalledWith(
-        'Could not retrieve results from s3',
-      );
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(1);
+      // expect(console.log).toHaveBeenCalledWith(
+      //   'Could not retrieve results from s3',
+      // );
     });
   });
 

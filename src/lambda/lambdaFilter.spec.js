@@ -1,8 +1,20 @@
 const { determineFilePropertiesBasedOnTags } = require('../utils/handlers');
 const { findArrayDifference } = require('../utils/helper');
+const logger = require('../logger/logger');
 
 const { filterFeatureFilesByTag } = require('./lambdaFilter');
-
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('../utils/handlers');
 jest.mock('../utils/helper');
 

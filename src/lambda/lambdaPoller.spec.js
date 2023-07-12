@@ -9,7 +9,18 @@ const { checkFileExistsInS3 } = require('../s3');
 const { debugThrottling } = require('../debug');
 
 const { pollLambdasWithThrottling } = require('./lambdaPoller'); // replace with your actual module path
-
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('../utils/helper');
 jest.mock('../utils/handlers');
 jest.mock('../s3');

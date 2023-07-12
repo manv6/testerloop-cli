@@ -3,7 +3,18 @@ const { LambdaClient } = require('@aws-sdk/client-lambda');
 const { getInputData } = require('../utils/helper');
 
 const { getLambdaClient, clearClient } = require('./client');
-
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('../utils/helper', () => ({ getInputData: jest.fn() }));
 jest.mock('@aws-sdk/client-lambda', () => ({ LambdaClient: jest.fn() }));
 

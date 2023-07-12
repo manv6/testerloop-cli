@@ -4,7 +4,18 @@ const { getInputData } = require('../utils/helper');
 const { handleResult, createFinalCommand } = require('../utils/handlers');
 
 const { executeLocal } = require('./localExecutor');
-
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('child_process', () => ({
   spawn: jest.fn(),
 }));

@@ -3,12 +3,12 @@ const colors = require('colors');
 
 const { sendEventsToLambda } = require('../lambda/eventProcessor');
 const { syncS3TestResultsToLocal, uploadJSONToS3 } = require('../s3');
-const { debugS3, debugThrottling, debugTags } = require('../debug');
+const { debugThrottling, debugTags } = require('../debug');
+const { getLogger, endLogStream } = require('../logger/logger');
+const { setExitCode } = require('../utils/exitCode');
 
 const { clearTheArgs } = require('./argumentsParser');
 const {
-  setExitCode,
-  getExitCode,
   clearValues,
   categorizeTags,
   checkIfAllWiped,
@@ -20,19 +20,18 @@ const {
   getTestStatesPerId,
   getTestResultsFromAllFilesOnlyOnceByTestName,
 } = require('./helper');
-
 async function handleResult(bucket, s3RunPath, runId) {
   // Grab the files from the s3 and store them locally to get results
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + '/',
     '',
   )}/results`;
-
+  const logger = getLogger();
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log('Could not retrieve results from s3');
-    debugS3('ERROR fetching results from s3', err);
+    logger.error('Could not retrieve results from s3', { err });
+    logger.debug('Could not retrieve results from s3', err);
     setExitCode(1);
   }
 
@@ -45,7 +44,7 @@ async function handleResult(bucket, s3RunPath, runId) {
     const { reporterBaseUrl, rerun } = await getInputData();
 
     if (rerun) {
-      console.log('Retrieving rerun results...');
+      logger.info('Retrieving rerun results...');
 
       // In case of rerun on ECS/local we have the following case
       // Get all tests state from all the files in descending order from creation and make sure it only appears once
@@ -68,7 +67,7 @@ async function handleResult(bucket, s3RunPath, runId) {
           !filteredPassedTests.includes(test.pathToTest + '|' + test.title),
       );
     } else {
-      console.log('Retrieving results...');
+      logger.info('Retrieving results...');
 
       // In case of no rerun just grab the results from the local files
       filteredFailedTests = await getTestPerState(
@@ -91,19 +90,24 @@ async function handleResult(bucket, s3RunPath, runId) {
       setExitCode(1);
     } else {
       setExitCode(0);
-      console.log('Good job! No failed tests found!');
+      logger.info('Good job! No failed tests found!');
     }
   } catch (err) {
-    console.log(
-      'There was an error trying to parse your result files. Please check your s3 and reporter configuration ',
+    logger.error(
+      'There was an error trying to parse your result files. Please check your s3 and reporter configuration',
+      { err },
     );
-    console.log('Error', err);
+    logger.debug(
+      'There was an error trying to parse your result files. Please check your s3 and reporter configuration',
+      err,
+    );
   }
 
-  process.exit(getExitCode());
+  endLogStream();
 }
 
 async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
+  const logger = getLogger();
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + '/',
     '',
@@ -111,8 +115,8 @@ async function getFailedLambdaTestResultsFromLocal(bucket, s3RunPath) {
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log('Could not retrieve results from s3');
-    debugS3('ERROR fetching results from s3', err);
+    logger.error('Could not retrieve results from s3', { err });
+    logger.debug('Could not retrieve results from s3', err);
     setExitCode(1);
   }
 
@@ -135,6 +139,7 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   listOfTestIdsToCheckResults,
   s3RunPath,
 ) {
+  const logger = getLogger();
   const directory = `./logs/testResults/${s3RunPath.replace(
     bucket + '/',
     '',
@@ -142,8 +147,8 @@ async function getLambdaTestResultsFromLocalBasedOnId(
   try {
     await syncS3TestResultsToLocal(s3RunPath);
   } catch (err) {
-    console.log('Could not retrieve results from s3');
-    debugThrottling('ERROR fetching results from s3', err);
+    logger.error('Could not retrieve results from s3', { err });
+    logger.debug('Could not retrieve results from s3', err);
     setExitCode(1);
   }
 
@@ -200,6 +205,7 @@ async function createFinalCommand() {
 }
 
 async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
+  const logger = getLogger();
   try {
     const lcl = new LCL();
     const commit = lcl.getLastCommitSync();
@@ -223,13 +229,16 @@ async function createAndUploadCICDFileToS3Bucket(s3BucketName, s3RunPath) {
       return acc;
     }, env); // Check if each variable in additionalEnvsForLocalExecution is already in env
 
-    await uploadJSONToS3(s3BucketName, s3RunPath, { ...commit, ...env });
+    await uploadJSONToS3(s3BucketName, s3RunPath, {
+      ...commit,
+      ...env,
+    });
   } catch (err) {
-    console.log('ERROR: Not able to upload the cicd.json file to s3.');
-    console.log(
+    logger.error('ERROR: Not able to upload the cicd.json file to s3', { err });
+    logger.warning(
       'This can result in a breaking bebug page. Make sure your git repository is properly setup',
     );
-    console.log('Error: ', err);
+    logger.debug('ERROR: Not able to upload the cicd.json file to s3', err);
   }
 }
 
@@ -245,12 +254,13 @@ function getEnvVariableValuesFromCi(listOfVariables) {
 }
 
 function getEnvVariableWithValues(jsonVariables) {
+  const logger = getLogger();
   // Check if jsonVariables is an array
   colors.enable();
   if (Array.isArray(jsonVariables)) {
-    console.log(
+    logger.warning(
       colors.red(
-        "ERROR - 'envVariablesWithValues' in your testerlooprc.json is an array when it should be an object. \nThis can cause your tests to not work properly",
+        "The 'envVariablesWithValues' in your testerlooprc.json is an array when it should be an object. \nThis can cause your tests to not work properly",
       ),
     );
     return [];
@@ -270,12 +280,13 @@ function getEnvVariableWithValues(jsonVariables) {
 }
 
 async function handleExecutionTimeout(timeCounter) {
+  const logger = getLogger();
   const colors = require('colors');
   colors.enable();
   const { executionTimeOutSecs } = await getInputData();
   if (timeCounter >= executionTimeOutSecs) {
     setExitCode(1);
-    console.log(
+    logger.info(
       colors.red(
         'Execution timed out after ' +
           executionTimeOutSecs +
@@ -287,11 +298,12 @@ async function handleExecutionTimeout(timeCounter) {
 }
 
 async function checkLambdaHasTimedOut(test, lambdaTimeOutSecs) {
+  const logger = getLogger();
   const timeNow = Date.now();
   if (timeNow - test.startDate < lambdaTimeOutSecs * 1000) {
     return false;
   } else {
-    console.log(
+    logger.warning(
       `- Lambda '${test.tlTestId}' has timed out after ${lambdaTimeOutSecs} seconds`,
     );
     return true;
@@ -319,6 +331,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
   lambdaArn,
   envVariables,
 ) {
+  const logger = getLogger();
   let listOfFilesToSend = [];
   let tempResults = [];
   let numberOfTestFilesSent = testsSentSoFar;
@@ -350,7 +363,7 @@ async function sendTestsToLambdasBasedOnAvailableSlots(
     );
 
     tempResults.forEach((result, index) => {
-      console.log(
+      logger.info(
         `--> Triggered Test id: ${result.$metadata.requestId} -> ${listOfFilesToSend[index]}`,
       );
 

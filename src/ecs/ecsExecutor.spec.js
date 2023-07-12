@@ -14,6 +14,19 @@ const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
 const { executeEcs } = require('./ecsExecutor');
 
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
+
 jest.mock('glob', () => ({ sync: jest.fn() }));
 jest.mock('@aws-sdk/client-ecs', () => ({
   waitUntilTasksStopped: jest.fn(),

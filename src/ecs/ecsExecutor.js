@@ -9,6 +9,7 @@ const {
   getEcsEnvVariables,
 } = require('../utils/envVariables/envVariablesHandler');
 const { getInputData } = require('../utils/helper');
+const { getLogger } = require('../logger/logger');
 
 const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
@@ -27,6 +28,8 @@ async function executeEcs(runId, s3RunPath) {
     customCommand,
     ecsPublicIp,
   } = await getInputData();
+
+  const logger = getLogger();
 
   // Check if we passed one feature file or a whole folder of feature files
   let suffix = '/*.feature';
@@ -78,16 +81,17 @@ async function executeEcs(runId, s3RunPath) {
         );
       }
       if (fileHasTag === null && tag !== undefined)
-        console.log(
+        logger.info(
           `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`,
         );
+
       if (!unWipedScenarios)
-        console.log(
+        logger.info(
           `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
         );
     }),
   );
-  console.log('Executing ', pendingEcsTasks.length, ' tasks:');
+  logger.info('Executing ' + pendingEcsTasks.length + ' tasks:');
   let counter = 0;
   for (const taskArn of await Promise.all(pendingEcsTasks)) {
     tasks.push(taskArn);
@@ -95,11 +99,13 @@ async function executeEcs(runId, s3RunPath) {
     if (typeof taskArn !== 'string') throw Error('Task ARN is not defined.');
     counter++;
   }
-  console.log('Task(s): ', taskDetails);
+  logger.info(`Task(s):  ${tasks}`, {
+    taskDetails,
+  });
 
   if (tasks.length > 0) {
-    // Wait for tasks to complete
-    console.log('Starting to poll for tasks to complete');
+    // Wait for tasks to   complete
+    logger.info('Starting to poll for tasks to complete');
     let waitECSTask;
     try {
       waitECSTask = await waitUntilTasksStopped(
@@ -112,10 +118,11 @@ async function executeEcs(runId, s3RunPath) {
         { cluster: clusterARN, tasks },
       );
     } catch (err) {
-      console.log('Error waiting for the ecs tasks', err);
+      logger.error('Error waiting for the ecs tasks', { err });
+      logger.debug('Error waiting for the ecs tasks', err);
     }
 
-    console.log(`\tNumber of tasks ran: ${tasks.length}`);
+    logger.info(`\tNumber of tasks ran: ${tasks.length}`);
     // Check if task timed out
     let timedOutContainers = [];
     waitECSTask.reason.tasks.forEach((task) => {
@@ -131,8 +138,7 @@ async function executeEcs(runId, s3RunPath) {
       );
     // Log task names and arns
     for (let i = 0; i < taskDetails.length; i++) {
-      console.log('\n');
-      console.log(
+      logger.info(
         `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${
           taskDetails[i].arn
         }`,

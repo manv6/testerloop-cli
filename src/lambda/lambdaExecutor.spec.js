@@ -7,8 +7,19 @@ const {
 
 const { executeLambdas } = require('./lambdaExecutor');
 const { pollLambdasWithThrottling } = require('./lambdaPoller');
-const { sliceFeatureFilesRecursively } = require('./lambdaSlicer');
 
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('../utils/helper');
 jest.mock('./lambdaPoller');
 jest.mock('./lambdaSlicer');

@@ -26,20 +26,15 @@ async function sliceFeatureFilesRecursively(specFilePath) {
   // Find all the feature files in the given directory and its subfolders
   const featureFilesToSplit = [];
   let filesToExecute = findFeatureFilesRecursively(specFilePath);
-
-  console.log('filesToExecute', filesToExecute);
   // Replace the feature file names with a * pattern and put in a unique set
   for (const fileWithName of filesToExecute) {
-    console.log('fileWithName', fileWithName);
     const segments = fileWithName.split('/');
     segments.pop();
-    console.log('segments', segments);
     const transformedString = segments.join('/') + '/*.feature';
     featureFilesToSplit.push(transformedString);
   }
   const uniqueFeaturesPatternArray = [...new Set(featureFilesToSplit)];
 
-  console.log('uniqueFeaturesPatternArray', uniqueFeaturesPatternArray);
   // Refactor to accept multiple files
   // Slice the found feature files to create the parsed files
   for (let patternToSlice of uniqueFeaturesPatternArray) {

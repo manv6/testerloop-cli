@@ -3,11 +3,10 @@ const colors = require('colors');
 const {
   createRunLinks,
   createFailedLinks,
-  setExitCode,
-  getExitCode,
   line,
   getInputData,
 } = require('../utils/helper');
+const { setExitCode, getExitCode } = require('../utils/exitCode');
 const {
   handleResult,
   getFailedLambdaTestResultsFromLocal,
@@ -17,6 +16,7 @@ const {
   getLambdaEnvVariables,
 } = require('../utils/envVariables/envVariablesHandler');
 const { debugThrottling } = require('../debug');
+const { getLogger } = require('../logger/logger');
 
 const { sliceFeatureFilesRecursively } = require('./lambdaSlicer');
 const { filterFeatureFilesByTag } = require('./lambdaFilter');
@@ -25,6 +25,7 @@ const { pollLambdasWithThrottling } = require('./lambdaPoller');
 colors.enable();
 
 async function executeLambdas(runId, s3RunPath) {
+  const logger = getLogger();
   const { specFilesPath, s3BucketName, tag, rerun, reporterBaseUrl } =
     await getInputData();
 
@@ -41,11 +42,11 @@ async function executeLambdas(runId, s3RunPath) {
     envVars,
     s3RunPath,
   );
-  console.log('RUN FINISHED');
+  logger.info('Run finished');
 
   if (listOfLambdasWhichTimedOut.length > 0) {
     line();
-    console.log(
+    logger.info(
       colors.yellow('Some tests timed out during this run: '),
       listOfLambdasWhichTimedOut,
     );
@@ -73,17 +74,17 @@ async function executeLambdas(runId, s3RunPath) {
       ...new Set([...listOfFailedLambdaTests, ...listOfFilesToRerun]),
     ];
 
-    console.log(
+    logger.info(
       colors.yellow(
         '* There are timed out lambdas or failed tests and rerun has been enabled ',
       ),
     );
-    console.log('Rerunning the below tests', listOfFilesToRerun);
+    logger.info('Rerunning the below tests', listOfFilesToRerun);
     const {
       allIdsMapped: requestIdsToCheckForRerun,
       listOfLambdasWhichTimedOut: rerunTimedOutLambdasList,
     } = await pollLambdasWithThrottling(listOfFilesToRerun, envVars, s3RunPath);
-    console.log('RUN FINISHED');
+    logger.info('Run finished');
     line();
     const rerunTestResults = await getLambdaTestResultsFromLocalBasedOnId(
       s3BucketName,
@@ -95,7 +96,7 @@ async function executeLambdas(runId, s3RunPath) {
     );
 
     if (rerunTimedOutLambdasList.length > 0) {
-      console.log(
+      logger.info(
         colors.yellow('Some tests timed out during rerun: '),
         rerunTimedOutLambdasList,
       );

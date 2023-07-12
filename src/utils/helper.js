@@ -4,11 +4,11 @@ const path = require('path');
 const { v4 } = require('uuid');
 const fse = require('fs-extra');
 
+const { getLogger } = require('../logger/logger');
+
 const { parseArguments } = require('./argumentsParser');
 
 const defaultExecutionType = 'local';
-
-let exitCode;
 
 function wait(ms = 5000) {
   return new Promise((resolve) => {
@@ -43,14 +43,6 @@ async function arraysHaveSameElements(id, res) {
 
 function getNewRunId() {
   return v4();
-}
-
-function getExitCode() {
-  return exitCode;
-}
-
-function setExitCode(code) {
-  return (exitCode = code);
 }
 
 function getOrgUrl(orgUrl) {
@@ -170,54 +162,34 @@ function clearFeaturePath(featureFile) {
 }
 
 async function getFilesSortedByMostRecent(directory, filePrefix) {
+  const logger = getLogger();
   try {
     const files = await fse.readdir(directory);
     const results = files.filter((file) => file.startsWith(filePrefix));
     // Extract and convert timestamps, then sort in ascending order
-    var sortedTimestamps = results
+    let sortedTimestamps = results
       .map(function (result) {
-        var timestamp = result.replace(filePrefix, '').replace('.json', '');
+        let timestamp = result.replace(filePrefix, '').replace('.json', '');
         return parseInt(timestamp, 10);
       })
       .sort(function (a, b) {
         return b - a;
       });
     // Create a new array with sorted string items
-    var sortedItems = sortedTimestamps.map(function (timestamp) {
+    let sortedItems = sortedTimestamps.map(function (timestamp) {
       return filePrefix + timestamp + '.json';
     });
     // Output the sorted items
     return sortedItems;
   } catch (err) {
-    console.log(
+    logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+
+      { err },
     );
-    return [];
-  }
-}
-
-async function getTestResultsFromAllFilesOnlyOnce(directory, filePrefix) {
-  let responseArray = [];
-  let checkedTestIds = [];
-
-  try {
-    const files = await getFilesSortedByMostRecent(directory, filePrefix);
-    for (const file of files) {
-      if (file.startsWith(filePrefix)) {
-        const json = await fse.readJSON(path.join(directory, file));
-        for (const contents of json) {
-          const testID = contents.testId;
-          if (!checkedTestIds.includes(testID)) {
-            responseArray.push(contents);
-            checkedTestIds.push(contents.testId);
-          }
-        }
-      }
-    }
-    return responseArray;
-  } catch (err) {
-    console.log(
+    logger.debug(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+      err,
     );
     return [];
   }
@@ -227,6 +199,7 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
   directory,
   filePrefix,
 ) {
+  const logger = getLogger();
   let responseArray = [];
   let checkedTestIds = [];
 
@@ -248,8 +221,13 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
     }
     return responseArray;
   } catch (err) {
-    console.log(
+    logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+      { err },
+    );
+    logger.debug(
+      '!! No result files found for this execution. Check your s3 or reporter setup',
+      err,
     );
     return [];
   }
@@ -257,6 +235,7 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
 
 async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
   let responseArray = [];
+  const logger = getLogger();
 
   try {
     const files = await fse.readdir(directory);
@@ -276,8 +255,13 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
     }
     return responseArray;
   } catch (err) {
-    console.log(
+    logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+      { err },
+    );
+    logger.debug(
+      '!! No result files found for this execution. Check your s3 or reporter setup',
+      err,
     );
     return [];
   }
@@ -285,7 +269,7 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
 
 async function getTestPerState(directory, filePrefix, testState) {
   let responseArray = [];
-
+  const logger = getLogger();
   try {
     const files = await fse.readdir(directory);
 
@@ -300,8 +284,13 @@ async function getTestPerState(directory, filePrefix, testState) {
     }
     return responseArray;
   } catch (err) {
-    console.log(
+    logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+      { err },
+    );
+    logger.debug(
+      '!! No result files found for this execution. Check your s3 or reporter setup',
+      err,
     );
     return [];
   }
@@ -309,6 +298,7 @@ async function getTestPerState(directory, filePrefix, testState) {
 
 async function getTestPerStateFromFile(directory, fileName, testState) {
   let responseArray = [];
+  const logger = getLogger();
 
   try {
     const json = await fse.readJSON(path.join(directory, fileName));
@@ -318,26 +308,33 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
     }
     return responseArray;
   } catch (err) {
-    console.log(
+    logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
+      { err },
+    );
+    logger.debug(
+      '!! No result files found for this execution. Check your s3 or reporter setup',
+      err,
     );
     return [];
   }
 }
 
 async function createFailedLinks(runId, failedTests, orgURL) {
+  const logger = getLogger();
   const colors = require('colors');
   colors.enable();
   for (const failed of failedTests) {
     const failedUrl = `${orgURL}/run/${runId}/test/${failed.testId}`;
-    console.log(`Test failed: ${failed.title} `, failedUrl);
+    logger.warning(`Test failed: ${failed.title}  ${failedUrl}`);
   }
   line();
 }
 
 async function createRunLinks(orgURL, runId) {
+  const logger = getLogger();
   line();
-  console.log(`Testerloop run URL: ${orgURL}/run/${runId}`);
+  logger.info(`Testerloop run URL: ${orgURL}/run/${runId}`);
   line();
 }
 
@@ -404,7 +401,6 @@ function checkIfAllWiped(filename, tag) {
     return true;
   }
 
-  console.log('numb of tagged', numOfTagged);
   let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
   numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
 
@@ -509,8 +505,6 @@ function showHelp() {
 
 module.exports = {
   getNewRunId,
-  getExitCode,
-  setExitCode,
   checkIfContainsTag,
   checkIfAllWiped,
   readConfigurationFIle,
@@ -527,7 +521,6 @@ module.exports = {
   createFailedLinks,
   findArrayDifference,
   arraysHaveSameElements,
-  getTestResultsFromAllFilesOnlyOnce,
   getTestResultsFromAllFilesOnlyOnceByTestName,
   getS3RunPath,
   getFilesSortedByMostRecent,

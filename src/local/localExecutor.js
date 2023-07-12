@@ -2,8 +2,11 @@ const { spawn } = require('child_process');
 
 const { getInputData } = require('../utils/helper');
 const { handleResult, createFinalCommand } = require('../utils/handlers');
+const { getLogger } = require('../logger/logger');
 
 async function executeLocal(runId, s3RunPath) {
+  const logger = getLogger();
+  logger.info('Initializing local execution...');
   const { s3BucketName, uploadFilesToS3, customPath, s3Region } =
     await getInputData();
 

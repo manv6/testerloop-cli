@@ -3,8 +3,21 @@ const path = require('path');
 const { cucumberSlicer } = require('cucumber-cypress-slicer');
 const glob = require('glob');
 
-const { sliceFeatureFilesRecursively } = require('./lambdaSlicer'); // replace with your actual module path
+const logger = require('../logger/logger');
 
+const { sliceFeatureFilesRecursively } = require('./lambdaSlicer'); // replace with your actual module path
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 jest.mock('glob', () => ({ sync: jest.fn() }));
 jest.mock('cucumber-cypress-slicer', () => ({ cucumberSlicer: jest.fn() }));
 

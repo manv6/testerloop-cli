@@ -6,8 +6,6 @@ const {
   findArrayDifference,
   findArrayUnion,
   getNewRunId,
-  getExitCode,
-  setExitCode,
   getOrgUrl,
   clearFeaturePath,
   extractTags,
@@ -16,12 +14,18 @@ const {
   checkIfContainsTag,
   checkIfAllWiped,
 } = require('./helper');
+const { setExitCode, getExitCode } = require('./exitCode');
 
 jest.mock('uuid', () => ({
   v4: () => '123e4567-e89b-12d3-a456-426614174000',
 }));
-jest.mock('fs', () => ({ readFileSync: jest.fn() }));
+jest.mock('fs', () => {
+  const mockFs = jest.requireActual('fs');
+
+  return { ...mockFs, readFileSync: jest.fn() };
+});
 jest.mock('fs-extra', () => ({ native: jest.fn() }));
+jest.mock('../logger/logger');
 
 describe('wait function', () => {
   jest.useFakeTimers();

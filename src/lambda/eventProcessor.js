@@ -4,9 +4,12 @@ const {
   InvocationType,
 } = require('@aws-sdk/client-lambda');
 
+const { getLogger } = require('../logger/logger');
+
 const { getLambdaClient } = require('./client');
 
 async function sendEventsToLambda(files, lambdaArn, envVars) {
+  const logger = getLogger();
   const client = await getLambdaClient();
 
   return new Promise(async (resolve) => {
@@ -27,7 +30,8 @@ async function sendEventsToLambda(files, lambdaArn, envVars) {
       );
       resolve(results);
     } catch (error) {
-      console.log('ERROR: could not send events', error);
+      logger.error('ERROR: could not send events', { error });
+      logger.debug('ERROR: could not send events', error);
       resolve();
     }
   });

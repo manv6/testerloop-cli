@@ -1,7 +1,22 @@
 const { RunTaskCommand } = require('@aws-sdk/client-ecs');
 
+const logger = require('../logger/logger');
+
 const { getEcsClient } = require('./client');
 const { sendCommandToEcs } = require('./taskProcessor'); // replace with the correct relative path to your module
+
+jest.mock('../logger/logger', () => {
+  const mockLogger = {
+    debug: jest.fn(),
+    error: jest.fn(),
+    warning: jest.fn(),
+    info: jest.fn(),
+  };
+  return {
+    endLogStream: jest.fn(),
+    getLogger: jest.fn().mockReturnValue(mockLogger),
+  };
+});
 
 jest.mock('./client', () => ({
   getEcsClient: jest.fn(),

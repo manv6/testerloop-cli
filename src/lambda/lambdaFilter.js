@@ -1,6 +1,8 @@
 const { determineFilePropertiesBasedOnTags } = require('../utils/handlers');
 const { findArrayDifference } = require('../utils/helper');
+const { getLogger } = require('../logger/logger');
 async function filterFeatureFilesByTag(featureFiles, tag) {
+  const logger = getLogger();
   // Determine the final files based on the tags
   const filesToIncludeBasedOnTags = [];
   const filesToExcludeBasedOnTags = [];
@@ -36,14 +38,16 @@ async function filterFeatureFilesByTag(featureFiles, tag) {
   );
 
   if (tag) {
-    console.log(
-      "Found files to execute matching tag criteria: '",
-      tag + "'",
-      '\nFiles found: ',
-      finalFiles,
-    );
+    logger.info(
+      "Found files to execute matching tag criteria: '" +
+        +tag +
+        "'" +
+        '\nFiles found: ' +
+        finalFiles,
+    ),
+      { finalFiles };
   } else {
-    console.log('Found files to execute: ', finalFiles);
+    logger.info('Found files to execute: ' + finalFiles, { finalFiles });
   }
 
   return finalFiles;
