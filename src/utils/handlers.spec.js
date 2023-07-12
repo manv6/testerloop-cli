@@ -39,6 +39,7 @@ jest.mock('../logger/logger', () => {
   };
   return {
     endLogStream: jest.fn(),
+    silentLog: jest.fn(),
     getLogger: jest.fn().mockReturnValue(mockLogger),
   };
 });

@@ -4,8 +4,8 @@ const colors = require('colors');
 const { sendEventsToLambda } = require('../lambda/eventProcessor');
 const { syncS3TestResultsToLocal, uploadJSONToS3 } = require('../s3');
 const { debugThrottling, debugTags } = require('../debug');
-const { getLogger, endLogStream } = require('../logger/logger');
-const { setExitCode } = require('../utils/exitCode');
+const { getLogger, endLogStream, silentLog } = require('../logger/logger');
+const { setExitCode, getExitCode } = require('../utils/exitCode');
 
 const { clearTheArgs } = require('./argumentsParser');
 const {
@@ -66,6 +66,11 @@ async function handleResult(bucket, s3RunPath, runId) {
         (test) =>
           !filteredPassedTests.includes(test.pathToTest + '|' + test.title),
       );
+
+      logger.debug(
+        `Failed tests in second run: ${JSON.stringify(filteredFailedTests)}`,
+      );
+      logger.debug(`Passed tests: ${JSON.stringify(filteredPassedTests)}`);
     } else {
       logger.info('Retrieving results...');
 
@@ -102,7 +107,10 @@ async function handleResult(bucket, s3RunPath, runId) {
       err,
     );
   }
-
+  logger.debug(`Exiting with exit code:  ${getExitCode()}`);
+  silentLog(logger, {
+    message: `Silent Log: Exiting with exit code: ${getExitCode()}`,
+  });
   endLogStream();
 }
 

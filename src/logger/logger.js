@@ -34,14 +34,9 @@ const pollingInterval = 1000; // 1 second
 
 function checkWritableFinished() {
   if (s3_stream.writableFinished) {
-    // console.log('Logging finished with no more content.');
-    // Perform any additional actions here
-    // console.log('Exit code: ', getExitCode());
-
     clearInterval(pollingIntervalId); // Stop polling
+    console.log('Testerloop CLI exited with exit code: ', getExitCode());
     process.exit(getExitCode());
-  } else {
-    // console.log('Still have things to log...');
   }
 }
 
