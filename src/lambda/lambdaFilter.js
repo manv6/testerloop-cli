@@ -40,7 +40,7 @@ async function filterFeatureFilesByTag(featureFiles, tag) {
   if (tag) {
     logger.info(
       "Found files to execute matching tag criteria: '" +
-        +tag +
+        tag +
         "'" +
         '\nFiles found: ' +
         finalFiles,
