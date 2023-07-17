@@ -7,6 +7,7 @@ const fse = require('fs-extra');
 const { getLogger } = require('../logger/logger');
 
 const { parseArguments } = require('./argumentsParser');
+const { setExitCode } = require('./exitCode');
 
 const defaultExecutionType = 'local';
 
@@ -184,13 +185,13 @@ async function getFilesSortedByMostRecent(directory, filePrefix) {
   } catch (err) {
     logger.error(
       '!! No result files found for this execution. Check your s3 or reporter setup',
-
       { err },
     );
     logger.debug(
       '!! No result files found for this execution. Check your s3 or reporter setup',
       err,
     );
+    setExitCode(1);
     return [];
   }
 }
@@ -229,6 +230,7 @@ async function getTestResultsFromAllFilesOnlyOnceByTestName(
       '!! No result files found for this execution. Check your s3 or reporter setup',
       err,
     );
+    setExitCode(1);
     return [];
   }
 }
@@ -263,6 +265,7 @@ async function getTestStatesPerId(directory, filePrefix, listOfTestsToCheck) {
       '!! No result files found for this execution. Check your s3 or reporter setup',
       err,
     );
+    setExitCode(1);
     return [];
   }
 }
@@ -292,6 +295,7 @@ async function getTestPerState(directory, filePrefix, testState) {
       '!! No result files found for this execution. Check your s3 or reporter setup',
       err,
     );
+    setExitCode(1);
     return [];
   }
 }
@@ -316,6 +320,7 @@ async function getTestPerStateFromFile(directory, fileName, testState) {
       '!! No result files found for this execution. Check your s3 or reporter setup',
       err,
     );
+    setExitCode(1);
     return [];
   }
 }

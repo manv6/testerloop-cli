@@ -80,7 +80,7 @@ describe('handlers', () => {
         reporterBaseUrl: orgUrl,
         rerun: true,
       });
-      const expectedExitCode = 1;
+      const expectedExitCode = null;
 
       const getTestPerStateMock = jest.fn().mockResolvedValue([
         {
@@ -158,14 +158,13 @@ describe('handlers', () => {
       ).toHaveBeenCalled();
       expect(getTestPerStateMock).not.toHaveBeenCalled();
 
-      expect(helper.createRunLinks).toHaveBeenCalled();
       expect(helper.createFailedLinks).toHaveBeenCalledWith(
         runId,
         failedTestResults,
         orgUrl,
       );
-
-      expect(exitCode.setExitCode).toHaveBeenCalledWith(expectedExitCode);
+      expect(helper.createRunLinks).toHaveBeenCalled();
+      expect(exitCode.setExitCode).toHaveBeenCalledWith(1);
       expect(logger.endLogStream).toHaveBeenCalledWith();
     });
 

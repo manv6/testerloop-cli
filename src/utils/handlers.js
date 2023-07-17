@@ -88,12 +88,15 @@ async function handleResult(bucket, s3RunPath, runId) {
       );
     }
 
-    await createRunLinks(reporterBaseUrl, runId);
-
-    if (filteredFailedTests.length > 0) {
+    // Failed tests found
+    if (filteredFailedTests.length > 0 && getExitCode() !== 1) {
+      await createRunLinks(reporterBaseUrl, runId);
       await createFailedLinks(runId, filteredFailedTests, reporterBaseUrl);
       setExitCode(1);
-    } else {
+    }
+    // All tests passed and no issue was found
+    else if (filteredFailedTests.length === 0 && getExitCode() !== 1) {
+      await createRunLinks(reporterBaseUrl, runId);
       setExitCode(0);
       logger.info('Good job! No failed tests found!');
     }

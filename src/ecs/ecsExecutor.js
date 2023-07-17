@@ -8,8 +8,9 @@ const {
 const {
   getEcsEnvVariables,
 } = require('../utils/envVariables/envVariablesHandler');
-const { getInputData } = require('../utils/helper');
+const { getInputData, line } = require('../utils/helper');
 const { getLogger } = require('../logger/logger');
+const { setExitCode } = require('../utils/exitCode');
 
 const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
@@ -99,52 +100,85 @@ async function executeEcs(runId, s3RunPath) {
     if (typeof taskArn !== 'string') throw Error('Task ARN is not defined.');
     counter++;
   }
-  logger.info(`Task(s):  ${tasks}`, {
-    taskDetails,
-  });
 
-  if (tasks.length > 0) {
-    // Wait for tasks to   complete
-    logger.info('Starting to poll for tasks to complete');
-    let waitECSTask;
-    try {
-      waitECSTask = await waitUntilTasksStopped(
-        {
-          client: await getEcsClient(),
-          maxWaitTime: 1200,
-          maxDelay: 10,
-          minDelay: 5,
-        },
-        { cluster: clusterARN, tasks },
-      );
-    } catch (err) {
-      logger.error('Error waiting for the ecs tasks', { err });
-      logger.debug('Error waiting for the ecs tasks', err);
-    }
+  async function handleTasks() {
+    const timeoutTasks = [];
+    if (tasks.length > 0) {
+      const maxWaitTime = 1200;
+      const maxDelay = 10;
+      const minDelay = 5;
 
-    logger.info(`\tNumber of tasks ran: ${tasks.length}`);
-    // Check if task timed out
-    let timedOutContainers = [];
-    waitECSTask.reason.tasks.forEach((task) => {
-      const container = task.containers.find((container) => {
-        return container['name'] === containerName;
-      });
-      if (container.exitCode === 124)
-        timedOutContainers.push(container.taskArn);
-    });
-    if (timedOutContainers.length > 0)
-      throw new Error(
-        `Task(s) ${timedOutContainers} timed out and failed with exit code 124}`,
-      );
-    // Log task names and arns
-    for (let i = 0; i < taskDetails.length; i++) {
-      logger.info(
-        `\t${i + 1} Feature: ${taskDetails[i].fileName}, task arn: ${
-          taskDetails[i].arn
-        }`,
-      );
+      try {
+        // Wait for tasks to   complete
+
+        const waitPromises = taskDetails.map(async (taskDetail) => {
+          return new Promise(async (resolve) => {
+            try {
+              logger.info(
+                `+ Executing task: ${taskDetail.arn} -> ${taskDetail.fileName}`,
+              );
+              const waitECSTask = await waitUntilTasksStopped(
+                {
+                  client: await getEcsClient(),
+                  maxWaitTime: maxWaitTime,
+                  maxDelay: maxDelay,
+                  minDelay: minDelay,
+                },
+                { cluster: clusterARN, tasks: [taskDetail.arn] },
+              );
+              logger.info(
+                `Task completed successfully ${taskDetail.arn} -> ${taskDetail.fileName}`,
+              );
+              resolve(waitECSTask);
+            } catch (error) {
+              if (error.toString().includes('TimeoutError')) {
+                // Handle the timeout exception for the current task
+                timeoutTasks.push({
+                  taskArn: taskDetail.arn,
+                  fileName: taskDetail.fileName,
+                });
+                logger.warning(
+                  `Timeout exception occurred for task: ${taskDetail.arn} -> ${taskDetail.fileName}`,
+                );
+              } else {
+                // Handle other types of exceptions
+                logger.warning(
+                  `An error occurred for task ${taskDetail} -> ${taskDetail.fileName}`,
+                  {
+                    error,
+                  },
+                );
+                logger.debug(
+                  `An error occurred for task ${taskDetail} -> ${
+                    taskDetail.fileName
+                  }, ${JSON.stringify(error)}`,
+                );
+              }
+              setExitCode(1);
+              resolve(error);
+            }
+          });
+        });
+        logger.info('Starting to poll for tasks to complete');
+        await Promise.all(waitPromises);
+        line();
+        logger.info('All tasks completed.');
+        if (timeoutTasks.length > 0) {
+          logger.warning(`Timed-out tasks: ${JSON.stringify(timeoutTasks)}`);
+          logger.error(
+            `There were "${timeoutTasks.length}" timed out tasks after 20 minutes. Results cannot be guaranteed and thus testerloop will fail the build.`,
+          );
+        }
+      } catch (err) {
+        logger.error('Error waiting for the ecs tasks', { err });
+        logger.debug('Error waiting for the ecs tasks', err);
+        setExitCode(1);
+      }
     }
   }
+
+  await handleTasks();
+
   if (tasks.length > 0) {
     await handleResult(s3BucketName, s3RunPath, runId);
   }
