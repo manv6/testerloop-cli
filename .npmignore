@@ -1,0 +1,8 @@
+coverage/
+build/
+src/
+etcs.config.js
+index.js
+obfuscator.config.json
+tsconfig.build.json
+tsconfig.json

@@ -1,10 +1,15 @@
-name: Build & Publish Testerloop CLI Package
+name: Build & Publish Testerloop CLI NPM Package
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - '*'
 
+env:
+  NEW_VERSION: ${{ github.ref_name }}
 jobs:
-  build:
+  tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -13,7 +18,13 @@ jobs:
           node-version: 16
       - run: npm ci
 
-  publish-gpr:
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npm run test:cov -- --coverageReporters json-summary
+
+  publish-npm:
     needs: build
     runs-on: ubuntu-latest
     permissions:
@@ -29,22 +40,20 @@ jobs:
 
       - name: Login to GitHub Package Registry
         run: echo "//npm.pkg.github.com/:_authToken=${{secrets.GITHUB_TOKEN}}" >> ~/.npmrc
-      - run: npm publish
+      - run: npm publish --tag ${{ env.NEW_VERSION }}
         env:
           NODE_AUTH_TOKEN: ${{secrets.GITHUB_TOKEN}}
-      - name: Get latest release
-        id: release
-        uses: actions/github-script@v4
+
+      - name: Build Release
+        uses: actions/create-release@v1
         with:
-          script: |
-            const releases = await github.repos.listReleases({
-              owner: context.repo.owner,
-              repo: context.repo.repo
-            });
-            const sortedReleases = releases.data.sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-            const latestRelease = sortedReleases[0];
-            console.log(latestRelease.tag_name);
-            core.setOutput('tag_name', latestRelease.tag_name);
+          tag_name: 'beta-${{ env.NEW_VERSION }}'
+          release_name: 'Release ${{ env.NEW_VERSION }}'
+          body: 'Release ${{ env.NEW_VERSION }}'
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Send Slack notification
         uses: rtCamp/action-slack-notify@v2
@@ -53,4 +62,4 @@ jobs:
           SLACK_MESSAGE: |
             Build & Publish Testerloop CLI Package workflow completed.
 
-            Latest Release: *[ ${{ steps.release.outputs.tag_name }} ]* (https://github.com/${{ github.repository }}/releases/latest)
+            Latest Release: *[ ${{ env.NEV_VERSION }} ]* (https://github.com/${{ github.repository }}/releases/${{ env.NEW_VERSION }})
