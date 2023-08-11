@@ -25,7 +25,7 @@ jobs:
         run: npm run test:cov -- --coverageReporters json-summary
 
   publish-npm:
-    needs: build
+    needs: tests
     runs-on: ubuntu-latest
     permissions:
       packages: write
