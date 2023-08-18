@@ -1,5 +1,9 @@
 name: Run Tests and Linters
 on:
+  push:
+    branches:
+      - master
+      - multitenant
   workflow_dispatch:
   pull_request:
 
