@@ -33,7 +33,7 @@ async function executeEcs(runId, s3RunPath) {
   const logger = getLogger();
 
   // Check if we passed one feature file or a whole folder of feature files
-  let suffix = '/*.feature';
+  let suffix = '/**/*.feature';
   if (specFilesPath.includes('.feature') === true) suffix = '';
   const files = glob.sync(`${specFilesPath}${suffix}`).map((file) => `${file}`);
 

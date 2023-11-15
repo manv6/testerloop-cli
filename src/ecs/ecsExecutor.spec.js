@@ -86,7 +86,7 @@ describe('executeEcs', () => {
     await executeEcs('runId', 's3RunPath');
 
     // Verify that functions were called with the correct parameters
-    expect(glob.sync).toHaveBeenCalledWith('./specs/*.feature');
+    expect(glob.sync).toHaveBeenCalledWith('./specs/**/*.feature');
     expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith(
       'file1',
       'tag1',
@@ -134,7 +134,7 @@ describe('executeEcs', () => {
     );
 
     // Verify that functions were called with the correct parameters
-    expect(glob.sync).toHaveBeenCalledWith('./specs/*.feature');
+    expect(glob.sync).toHaveBeenCalledWith('./specs/**/*.feature');
     expect(determineFilePropertiesBasedOnTags).toHaveBeenCalledWith(
       'file1',
       'tag1',
