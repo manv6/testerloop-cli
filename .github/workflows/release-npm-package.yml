@@ -2,9 +2,6 @@ name: Build & Publish Testerloop CLI NPM Package
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - '*'
 
 env:
   NEW_VERSION: ${{ github.ref_name }}
