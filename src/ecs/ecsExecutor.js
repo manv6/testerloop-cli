@@ -1,5 +1,6 @@
 const glob = require('glob');
 const { waitUntilTasksStopped } = require('@aws-sdk/client-ecs');
+const semaphore = require('semaphore');
 
 const {
   handleResult,
@@ -33,18 +34,88 @@ async function executeEcs(runId, s3RunPath) {
 
   const client = await getEcsClient();
   const logger = getLogger();
-  let suffix = '/**/*.feature';
-  if (specFilesPath.includes('.feature')) suffix = '';
-  const files = glob.sync(`${specFilesPath}${suffix}`);
+  const files = getFeatureFiles(specFilesPath);
+  const sem = semaphore(ecsThreads > 0 ? ecsThreads : files.length);
+  const taskPromises = [];
 
-  const concurrencyLimit = ecsThreads > 0 ? ecsThreads : files.length;
-  let activeTasks = 0;
-  const tasksQueue = [];
+  if (ecsThreads > 0) {
+    logger.info(
+      `Throttling executions: only ${ecsThreads} tasks will run concurrently.`,
+    );
+  } else {
+    logger.info(
+      `No throttling applied: processing all ${files.length} files concurrently.`,
+    );
+  }
 
-  const executeTask = async (file, resolve) => {
-    const filename = file.split('/').pop();
-    const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
-      determineFilePropertiesBasedOnTags(file, tag);
+  for (const file of files) {
+    const taskPromise = new Promise((resolve) => {
+      sem.take(async () => {
+        await processTask(file, {
+          client,
+          logger,
+          tag: tag,
+          containerName: containerName,
+          clusterARN: clusterARN,
+          taskDefinition: taskDefinition,
+          subnets: subnets,
+          securityGroups: securityGroups,
+          uploadToS3RoleArn: uploadToS3RoleArn,
+          customCommand: customCommand,
+          ecsPublicIp: ecsPublicIp,
+          runId,
+        });
+        resolve();
+        sem.leave();
+      });
+    });
+    taskPromises.push(taskPromise);
+  }
+
+  await Promise.all(taskPromises);
+
+  logger.info('All tasks have been executed.');
+  await handleResult(s3BucketName, s3RunPath, runId);
+}
+
+async function processTask(file, config) {
+  const {
+    client,
+    logger,
+    tag,
+    containerName,
+    clusterARN,
+    taskDefinition,
+    subnets,
+    securityGroups,
+    uploadToS3RoleArn,
+    customCommand,
+    ecsPublicIp,
+    runId,
+  } = config;
+  const filename = file.split('/').pop();
+  const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
+    determineFilePropertiesBasedOnTags(file, tag);
+
+  if (!fileHasTag && tag !== undefined) {
+    logger.info(
+      `* No "${tagsIncludedExcluded.includedTags.join(
+        ', ',
+      )}" tag in file ${file}`,
+    );
+  }
+
+  if (!unWipedScenarios) {
+    const excludedTagsList = tagsIncludedExcluded.excludedTags.join(', ');
+    if (excludedTagsList) {
+      logger.info(
+        `* All scenarios tagged as "${excludedTagsList}" for ${filename}`,
+      );
+    }
+    return;
+  }
+
+  if (fileHasTag && unWipedScenarios) {
     const envVars = await getEcsEnvVariables(runId);
     let finalCommand = customCommand
       ? `timeout 2400 ${customCommand
@@ -54,8 +125,8 @@ async function executeEcs(runId, s3RunPath) {
           ' ',
         );
 
-    if (unWipedScenarios && fileHasTag) {
-      sendCommandToEcs(
+    try {
+      const taskArn = await sendCommandToEcs(
         containerName,
         finalCommand,
         clusterARN,
@@ -65,67 +136,23 @@ async function executeEcs(runId, s3RunPath) {
         uploadToS3RoleArn,
         envVars,
         ecsPublicIp,
-      ).then((taskArn) => {
-        logger.info(`+ Executing task: ${taskArn} -> ${filename}`);
-        waitUntilTasksStopped(
-          { client, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
-          { cluster: clusterARN, tasks: [taskArn] },
-        )
-          .then(() => {
-            logger.info(
-              `Task completed successfully: ${taskArn} -> ${filename}`,
-            );
-            activeTasks--;
-            resolve();
-            if (tasksQueue.length > 0) {
-              const nextTask = tasksQueue.shift();
-              nextTask();
-            }
-          })
-          .catch((error) => {
-            logger.error(`Error with task ${taskArn} -> ${filename}:`, {
-              error,
-            });
-            setExitCode(1);
-            activeTasks--;
-            resolve();
-          });
-      });
-    } else {
-      if (!fileHasTag && tag !== undefined)
-        logger.info(
-          `* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`,
-        );
-
-      if (!unWipedScenarios) {
-        const excludedTagsList = tagsIncludedExcluded.excludedTags.join(', ');
-        if (excludedTagsList) {
-          logger.info(
-            `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
-          );
-        }
-      }
-      resolve();
+      );
+      logger.info(`+ Executing task: ${taskArn} -> ${filename}`);
+      await waitUntilTasksStopped(
+        { client, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
+        { cluster: clusterARN, tasks: [taskArn] },
+      );
+      logger.info(`Task completed successfully: ${taskArn} -> ${filename}`);
+    } catch (error) {
+      logger.error(`Error processing file -> ${filename}: ${error}`);
+      setExitCode(1);
     }
-  };
-
-  const enqueueTask = (file) => {
-    return new Promise((resolve) => {
-      if (activeTasks < concurrencyLimit) {
-        activeTasks++;
-        executeTask(file, resolve);
-      } else {
-        tasksQueue.push(() => executeTask(file, resolve));
-      }
-    });
-  };
-
-  await Promise.all(files.map((file) => enqueueTask(file)));
-
-  logger.info('All tasks have been executed.');
-  await handleResult(s3BucketName, s3RunPath, runId);
+  }
 }
 
-module.exports = {
-  executeEcs,
-};
+function getFeatureFiles(specFilesPath) {
+  let suffix = specFilesPath.includes('.feature') ? '' : '/**/*.feature';
+  return glob.sync(`${specFilesPath}${suffix}`);
+}
+
+module.exports = { executeEcs };
