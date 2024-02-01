@@ -172,36 +172,27 @@ async function getLambdaTestResultsFromLocalBasedOnId(
 }
 
 function determineFilePropertiesBasedOnTags(file, tag) {
-  // If tag exists then determine based on the tags
-  // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
-  let unWipedScenarios;
-  let fileHasTag;
-  let tagsIncludedExcluded;
-  if (tag) {
-    tagsIncludedExcluded = categorizeTags(tag);
-
-    tagsIncludedExcluded.includedTags.forEach((tag) => {
-      if (!fileHasTag) {
-        fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
-      }
-    });
-    debugTags(
-      'Included and excluded tags per file',
-      tagsIncludedExcluded,
-      ' -> ',
-      file,
-    );
-    let result = [];
-    tagsIncludedExcluded.excludedTags.forEach((tag) => {
-      result.push(checkIfAllWiped(file, tag));
-    });
-    unWipedScenarios = result.includes(false) ? false : true;
-
-    return { fileHasTag, unWipedScenarios, tagsIncludedExcluded };
-  } else {
-    unWipedScenarios = true;
-    return { unWipedScenarios };
+  // If no tags, return early and don't filter, otherwise categorise and proceed with logic
+  // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExcluded
+  if (!tag) {
+    return { fileHasTag: true, unWipedScenarios: true };
   }
+
+  const tagsIncludedExcluded = categorizeTags(tag);
+
+  const fileHasTag = tagsIncludedExcluded.includedTags.every(includedTag => 
+    checkIfContainsTag(file, includedTag));
+
+  const fileHasExcludedTag = tagsIncludedExcluded.excludedTags.some(excludedTag => 
+    checkIfContainsTag(file, excludedTag));
+
+  debugTags('Included and excluded tags per file', tagsIncludedExcluded, ' -> ', file);
+
+  if (!fileHasTag) {
+    return { fileHasTag, unWipedScenarios: false, tagsIncludedExcluded };
+  }
+
+  return { fileHasTag, unWipedScenarios: !fileHasExcludedTag, tagsIncludedExcluded };
 }
 
 async function createFinalCommand() {

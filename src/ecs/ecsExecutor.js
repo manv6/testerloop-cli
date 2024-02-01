@@ -63,7 +63,7 @@ async function executeEcs(runId, s3RunPath) {
             ' ',
           );
       }
-      if (unWipedScenarios && (fileHasTag || tag === undefined)) {
+      if (unWipedScenarios && fileHasTag) {
         // Send the events to ecs
         fileNames.push(filename);
 
@@ -81,15 +81,19 @@ async function executeEcs(runId, s3RunPath) {
           ),
         );
       }
-      if (fileHasTag === null && tag !== undefined)
+      if (!fileHasTag && tag !== undefined)
         logger.info(
           `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`,
         );
 
-      if (!unWipedScenarios)
-        logger.info(
-          `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
-        );
+      if (!unWipedScenarios) {
+        const excludedTagsList = tagsIncludedExcluded.excludedTags.join(', ');
+        if (excludedTagsList) {
+          logger.info(
+            `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
+          );
+        }
+      }
     }),
   );
   logger.info('Executing ' + pendingEcsTasks.length + ' tasks:');
