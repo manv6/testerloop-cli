@@ -76,6 +76,7 @@ async function getInputData() {
     tag,
     customCommand,
     lambdaThreads,
+    ecsThreads,
     showOnlyResultsForId,
     executionTimeOutSecs,
     help,
@@ -107,6 +108,9 @@ async function getInputData() {
       case '--lambda-threads':
         lambdaThreads = cliArgs[i + 1];
         break;
+      case '--ecs-threads':
+        ecsThreads = cliArgs[i + 1];
+        break;
       case '--help':
       case '-h':
         help = true;
@@ -128,6 +132,7 @@ async function getInputData() {
       lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
     lambdaThreads:
       lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
+    ecsThreads: ecsThreads || configurationData.ecs?.ecsThreads || 0,
     executionTypeInput: executionTypeInput || defaultExecutionType,
     containerName: configurationData.ecs?.containerName,
     clusterARN: configurationData.ecs?.clusterARN,

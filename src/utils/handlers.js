@@ -180,19 +180,30 @@ function determineFilePropertiesBasedOnTags(file, tag) {
 
   const tagsIncludedExcluded = categorizeTags(tag);
 
-  const fileHasTag = tagsIncludedExcluded.includedTags.every(includedTag => 
-    checkIfContainsTag(file, includedTag));
+  const fileHasTag = tagsIncludedExcluded.includedTags.every((includedTag) =>
+    checkIfContainsTag(file, includedTag),
+  );
 
-  const fileHasExcludedTag = tagsIncludedExcluded.excludedTags.some(excludedTag => 
-    checkIfContainsTag(file, excludedTag));
+  const fileHasExcludedTag = tagsIncludedExcluded.excludedTags.some(
+    (excludedTag) => checkIfContainsTag(file, excludedTag),
+  );
 
-  debugTags('Included and excluded tags per file', tagsIncludedExcluded, ' -> ', file);
+  debugTags(
+    'Included and excluded tags per file',
+    tagsIncludedExcluded,
+    ' -> ',
+    file,
+  );
 
   if (!fileHasTag) {
     return { fileHasTag, unWipedScenarios: false, tagsIncludedExcluded };
   }
 
-  return { fileHasTag, unWipedScenarios: !fileHasExcludedTag, tagsIncludedExcluded };
+  return {
+    fileHasTag,
+    unWipedScenarios: !fileHasExcludedTag,
+    tagsIncludedExcluded,
+  };
 }
 
 async function createFinalCommand() {
