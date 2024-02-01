@@ -16,6 +16,9 @@ const { setExitCode } = require('../utils/exitCode');
 const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
 
+// Execute on ECS in parallel (with or without throttling)
+// use semaphore to limit the number of concurrent tasks
+// If `ecsThreads` not specified or === 0, all tasks to be executed concurrently
 async function executeEcs(runId, s3RunPath) {
   const inputData = await getInputData();
   const client = await getEcsClient();
@@ -47,6 +50,9 @@ async function executeEcs(runId, s3RunPath) {
   await handleResult(inputData.s3BucketName, s3RunPath, runId);
 }
 
+// Process a single test file
+// determine  eligibility based on tags
+// if eligible send to ECS, wait for task to complete and handle result
 async function processTask(file, inputData, client, logger, runId) {
   const filename = file.split('/').pop();
   const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
