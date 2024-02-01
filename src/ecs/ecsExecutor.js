@@ -63,7 +63,7 @@ async function processTask(file, inputData, client, logger, runId) {
     const excludedTagsList = tagsIncludedExcluded.excludedTags.join(', ');
     if (excludedTagsList.length > 0) {
       logger.info(
-        `* All scenarios tagged as "${excludedTagsList}" for ${filename}`,
+        `* Skipping scenarios tagged as "${excludedTagsList}" for ${filename}`,
       );
     }
     return;
