@@ -698,10 +698,10 @@ describe('handlers', () => {
       jest.clearAllMocks();
     });
 
-    test('Case 1: No tag is provided. Only unWipedScenarios should be returned as true', () => {
+    test('Case 1: No tag is provided. unWipedScenarios and fileHasTag should be returned as true - no filter to be applied', () => {
       const file = 'file.feature';
       const tag = undefined;
-      const expected = { unWipedScenarios: true };
+      const expected = { fileHasTag: true, unWipedScenarios: true };
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });
@@ -735,7 +735,7 @@ describe('handlers', () => {
       helper.checkIfContainsTag.mockReturnValue(fileHasTagValue);
       const expected = {
         fileHasTag: fileHasTagValue,
-        unWipedScenarios: true,
+        unWipedScenarios: false,
         tagsIncludedExcluded: { includedTags: ['@tag2'], excludedTags: [] },
       };
       const result = determineFilePropertiesBasedOnTags(file, tag);
