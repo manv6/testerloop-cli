@@ -1,6 +1,6 @@
 const glob = require('glob');
 const { waitUntilTasksStopped } = require('@aws-sdk/client-ecs');
-const semaphore = require('semaphore');
+const { Semaphore } = require('async-mutex');
 
 const {
   handleResult,
@@ -24,7 +24,8 @@ async function executeEcs(runId, s3RunPath) {
   const client = await getEcsClient();
   const logger = getLogger();
   const files = getFeatureFiles(inputData.specFilesPath);
-  const sem = semaphore(
+
+  const sem = new Semaphore(
     inputData.ecsThreads > 0 ? inputData.ecsThreads : files.length,
   );
 
@@ -34,18 +35,12 @@ async function executeEcs(runId, s3RunPath) {
       : `No throttling applied: processing all ${files.length} files concurrently.`,
   );
 
-  const taskPromises = files.map(
-    (file) =>
-      new Promise((resolve) => {
-        sem.take(async () => {
-          await processTask(file, inputData, client, logger, runId);
-          resolve();
-          sem.leave();
-        });
-      }),
+  const taskPromises = files.map((file) =>
+    sem.runExclusive(() => processTask(file, inputData, client, logger, runId)),
   );
 
   await Promise.all(taskPromises);
+
   logger.info('All tasks have been executed.');
   await handleResult(inputData.s3BucketName, s3RunPath, runId);
 }
