@@ -418,7 +418,7 @@ function checkIfAllWiped(filename, tag) {
     return true;
   }
 
-  return numOfTagged < numOfScenarios;
+  return numOfTagged >= numOfScenarios;
 }
 
 async function readConfigurationFIle(file) {

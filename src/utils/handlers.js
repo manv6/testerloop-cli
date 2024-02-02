@@ -172,38 +172,45 @@ async function getLambdaTestResultsFromLocalBasedOnId(
 }
 
 function determineFilePropertiesBasedOnTags(file, tag) {
-  // If no tags, return early and don't filter, otherwise categorise and proceed with logic
-  // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExcluded
-  if (!tag) {
-    return { fileHasTag: true, unWipedScenarios: true };
-  }
+  const logger = getLogger();
+  if (!tag) return true;
 
-  const tagsIncludedExcluded = categorizeTags(tag);
-
-  const fileHasTag = tagsIncludedExcluded.includedTags.every((includedTag) =>
-    checkIfContainsTag(file, includedTag),
-  );
-
-  const fileHasExcludedTag = tagsIncludedExcluded.excludedTags.some(
-    (excludedTag) => checkIfContainsTag(file, excludedTag),
-  );
+  const { includedTags, excludedTags } = categorizeTags(tag);
 
   debugTags(
     'Included and excluded tags per file',
-    tagsIncludedExcluded,
+    { includedTags, excludedTags },
     ' -> ',
     file,
   );
 
-  if (!fileHasTag) {
-    return { fileHasTag, unWipedScenarios: false, tagsIncludedExcluded };
+  const hasIncludedTag =
+    includedTags.length > 0 &&
+    includedTags.some((includedTag) => checkIfContainsTag(file, includedTag));
+
+  const areAllScenariosWiped =
+    excludedTags.length > 0 &&
+    excludedTags.every((excludedTag) => checkIfAllWiped(file, excludedTag));
+
+  if (includedTags.length > 0 && !hasIncludedTag) {
+    logger.info(
+      `* File "${file}" does not contain any of the included tags: "${includedTags.join(
+        ', ',
+      )}"`,
+    );
+    return false;
   }
 
-  return {
-    fileHasTag,
-    unWipedScenarios: !fileHasExcludedTag,
-    tagsIncludedExcluded,
-  };
+  if (areAllScenariosWiped) {
+    logger.info(
+      `* File "${file}" is excluded as all scenarios are marked with excluded tags: "${excludedTags.join(
+        ', ',
+      )}"`,
+    );
+    return false;
+  }
+
+  return true;
 }
 
 async function createFinalCommand() {

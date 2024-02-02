@@ -6,31 +6,16 @@ async function filterFeatureFilesByTag(featureFiles, tag) {
   // Determine the final files based on the tags
   const filesToIncludeBasedOnTags = [];
   const filesToExcludeBasedOnTags = [];
-
   for (let file of featureFiles) {
-    const { unWipedScenarios, fileHasTag } = determineFilePropertiesBasedOnTags(
-      file,
-      tag,
-    );
+    const shouldProcess = determineFilePropertiesBasedOnTags(file, tag);
 
     // Replace the parsed path before sending it to the lambda executor.
     file = file.replace('cypress/e2e/parsed/', '');
 
-    // If scenario has desired included tags add it to included list
-    if (fileHasTag && tag !== undefined) {
-      filesToIncludeBasedOnTags.push(file);
-      // if scenario is wiped add the tag exists add it to excluded list
-    }
-    if (!unWipedScenarios && tag !== undefined) {
-      filesToExcludeBasedOnTags.push(file);
-    }
-
-    // In case where no tag exists all files are included
-    if (tag === undefined) {
-      filesToIncludeBasedOnTags.push(file);
-    }
+    shouldProcess
+      ? filesToIncludeBasedOnTags.push(file)
+      : filesToExcludeBasedOnTags.push(file);
   }
-
   // Cut off all the ones which should be excluded
   const finalFiles = findArrayDifference(
     filesToIncludeBasedOnTags,

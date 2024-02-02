@@ -50,59 +50,41 @@ async function executeEcs(runId, s3RunPath) {
 // if eligible send to ECS, wait for task to complete and handle result
 async function processTask(file, inputData, client, logger, runId) {
   const filename = file.split('/').pop();
-  const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
-    determineFilePropertiesBasedOnTags(file, inputData.tag);
+  const shouldProcess = determineFilePropertiesBasedOnTags(file, inputData.tag);
 
-  if (!fileHasTag && inputData.tag) {
-    logger.info(
-      `* No "${tagsIncludedExcluded.includedTags.join(
-        ', ',
-      )}" tag in file ${file}`,
-    );
-  }
-  if (!unWipedScenarios) {
-    const excludedTagsList = tagsIncludedExcluded.excludedTags.join(', ');
-    if (excludedTagsList.length > 0) {
-      logger.info(
-        `* Skipping scenarios tagged as "${excludedTagsList}" for ${filename}`,
-      );
-    }
+  if (!shouldProcess) {
     return;
   }
 
-  if (fileHasTag && unWipedScenarios) {
-    const envVars = await getEcsEnvVariables(runId);
-    const finalCommand = inputData.customCommand
-      ? `timeout 2400 ${inputData.customCommand
-          .replace(/%TEST_FILE\b/g, file)
-          .replace(/%TEST_FILENAME\b/g, filename)}`.split(' ')
-      : `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
-          ' ',
-        );
+  const envVars = await getEcsEnvVariables(runId);
+  const finalCommand = inputData.customCommand
+    ? `timeout 2400 ${inputData.customCommand
+        .replace(/%TEST_FILE\b/g, file)
+        .replace(/%TEST_FILENAME\b/g, filename)}`.split(' ')
+    : `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(' ');
 
-    try {
-      const taskArn = await sendCommandToEcs(
-        inputData.containerName,
-        finalCommand,
-        inputData.clusterARN,
-        inputData.taskDefinition,
-        inputData.subnets,
-        inputData.securityGroups,
-        inputData.uploadToS3RoleArn,
-        envVars,
-        inputData.ecsPublicIp,
-        client,
-      );
-      logger.info(`+ Executing task: ${taskArn} -> ${filename}`);
-      await waitUntilTasksStopped(
-        { client, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
-        { cluster: inputData.clusterARN, tasks: [taskArn] },
-      );
-      logger.info(`Task completed successfully: ${taskArn} -> ${filename}`);
-    } catch (error) {
-      logger.error(`Error processing file -> ${filename}: ${error}`);
-      setExitCode(1);
-    }
+  try {
+    const taskArn = await sendCommandToEcs(
+      inputData.containerName,
+      finalCommand,
+      inputData.clusterARN,
+      inputData.taskDefinition,
+      inputData.subnets,
+      inputData.securityGroups,
+      inputData.uploadToS3RoleArn,
+      envVars,
+      inputData.ecsPublicIp,
+      client,
+    );
+    logger.info(`+ Executing task: ${taskArn} -> ${filename}`);
+    await waitUntilTasksStopped(
+      { client, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
+      { cluster: inputData.clusterARN, tasks: [taskArn] },
+    );
+    logger.info(`Task completed successfully: ${taskArn} -> ${filename}`);
+  } catch (error) {
+    logger.error(`Error processing file -> ${filename}: ${error}`);
+    setExitCode(1);
   }
 }
 
