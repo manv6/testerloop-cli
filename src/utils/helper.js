@@ -404,21 +404,17 @@ function checkIfAllWiped(filename, tag) {
   // Check if every scenario is wipped
   const contents = readFileSync(filename, 'utf-8');
 
+  const scenarioRegex = /(?:@[\w]+[\s]*)*(Scenario:|Scenario Outline:)/g;
+
   const tagRegex = new RegExp(`${tag}`, 'g');
-  const numOfTagged = (contents.match(tagRegex) || []).length;
 
-  if (!numOfTagged) {
-    return true;
-  }
+  const allScenarios = contents.match(scenarioRegex) || [];
 
-  let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
-  numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
+  const taggedScenarios = contents.match(tagRegex) || [];
 
-  if (!numOfScenarios) {
-    return true;
-  }
-
-  return numOfTagged >= numOfScenarios;
+  return (
+    allScenarios.length > 0 && allScenarios.length === taggedScenarios.length
+  );
 }
 
 async function readConfigurationFIle(file) {
