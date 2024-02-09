@@ -172,36 +172,50 @@ async function getLambdaTestResultsFromLocalBasedOnId(
 }
 
 function determineFilePropertiesBasedOnTags(file, tag) {
-  // If tag exists then determine based on the tags
-  // Return the properties fileHasTag , unWipedScenarios, tagsIncludedExclude
-  let unWipedScenarios;
-  let fileHasTag;
-  let tagsIncludedExcluded;
-  if (tag) {
-    tagsIncludedExcluded = categorizeTags(tag);
-
-    tagsIncludedExcluded.includedTags.forEach((tag) => {
-      if (!fileHasTag) {
-        fileHasTag = tag !== undefined ? checkIfContainsTag(file, tag) : false;
-      }
-    });
-    debugTags(
-      'Included and excluded tags per file',
-      tagsIncludedExcluded,
-      ' -> ',
-      file,
+  const logger = getLogger();
+  if (!tag) {
+    logger.info(
+      `* No tags provided. File "${file}" will be executed by default.`,
     );
-    let result = [];
-    tagsIncludedExcluded.excludedTags.forEach((tag) => {
-      result.push(checkIfAllWiped(file, tag));
-    });
-    unWipedScenarios = result.includes(false) ? false : true;
-
-    return { fileHasTag, unWipedScenarios, tagsIncludedExcluded };
-  } else {
-    unWipedScenarios = true;
-    return { unWipedScenarios };
+    return true;
   }
+
+  const { includedTags, excludedTags } = categorizeTags(tag);
+
+  debugTags(
+    'Included and excluded tags per file',
+    { includedTags, excludedTags },
+    ' -> ',
+    file,
+  );
+
+  const hasIncludedTag =
+    includedTags.length > 0 &&
+    includedTags.some((includedTag) => checkIfContainsTag(file, includedTag));
+
+  const areAllScenariosWiped =
+    excludedTags.length > 0 &&
+    excludedTags.every((excludedTag) => checkIfAllWiped(file, excludedTag));
+
+  if (includedTags.length > 0 && !hasIncludedTag) {
+    logger.info(
+      `* File "${file}" does not contain any of the included tags: "${includedTags.join(
+        ', ',
+      )}"`,
+    );
+    return false;
+  }
+
+  if (areAllScenariosWiped) {
+    logger.info(
+      `* File "${file}" is excluded as all scenarios are marked with excluded tags: "${excludedTags.join(
+        ', ',
+      )}"`,
+    );
+    return false;
+  }
+
+  return true;
 }
 
 async function createFinalCommand() {

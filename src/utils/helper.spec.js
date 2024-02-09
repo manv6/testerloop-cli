@@ -115,12 +115,28 @@ describe('Tag related functions', () => {
     expect(checkIfContainsTag('@tag3', '@tag1 @tag2')).toBe(false);
   });
 
-  it('checkIfAllWiped should return true if all features are wiped', () => {
+  it('checkIfAllWiped should return TRUE if ALL scenarios are tagged with the specified tag', () => {
+    // TWO scenarios, both are tagged
+    const allWiped = `
+                        @wiped
+                        Scenario: First scenario
+                        @wiped
+                        Scenario Outline: First outline
+                        `;
+    // TWO scenarios, one is tagged, one is not
+    const notAllWiped = `
+                        @wiped
+                        Scenario: First scenario
+                        Scenario Outline: First outline without tag
+                        `;
+
     jest
       .spyOn(fs, 'readFileSync')
-      .mockReturnValue('@tag\nScenario: ScenarioOutline:');
-    expect(checkIfAllWiped('', '@wiped')).toBe(true);
-    expect(checkIfAllWiped('', '@tag')).toBe(false);
+      .mockReturnValueOnce(allWiped)
+      .mockReturnValueOnce(notAllWiped);
+
+    expect(checkIfAllWiped('mockFile.feature', '@wiped')).toBe(true);
+    expect(checkIfAllWiped('mockFile.feature', '@wiped')).toBe(false);
   });
 });
 
@@ -200,13 +216,5 @@ describe('Tag related functions', () => {
 
     expect(checkIfContainsTag('@tag1', '@tag1 @tag2')).toBe(true);
     expect(checkIfContainsTag('@tag3', '@tag1 @tag2')).toBe(false);
-  });
-
-  it('checkIfAllWiped should return true if all features are wiped', () => {
-    jest
-      .spyOn(fs, 'readFileSync')
-      .mockReturnValue('@tag\nScenario: ScenarioOutline:');
-    expect(checkIfAllWiped('', '@wiped')).toBe(true);
-    expect(checkIfAllWiped('', '@tag')).toBe(false);
   });
 });

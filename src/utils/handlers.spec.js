@@ -698,93 +698,63 @@ describe('handlers', () => {
       jest.clearAllMocks();
     });
 
-    test('Case 1: No tag is provided. Only unWipedScenarios should be returned as true', () => {
+    test('Case 1: No tag is provided, should return true (process all files)', () => {
       const file = 'file.feature';
       const tag = undefined;
-      const expected = { unWipedScenarios: true };
+      const expected = true;
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });
 
-    test('Case 2: One tag is provided. fileHasTag should also be true, and tagsIncludedExcluded should be returned', () => {
+    test('Case 2: File contains the provided included tag, should return true', () => {
       const file = 'file.feature';
       const tag = '@tag1';
       helper.categorizeTags.mockReturnValue({
         includedTags: ['@tag1'],
         excludedTags: [],
       });
-      const fileHasTagValue = true;
-      helper.checkIfContainsTag.mockReturnValue(fileHasTagValue);
-      const expected = {
-        fileHasTag: fileHasTagValue,
-        unWipedScenarios: true,
-        tagsIncludedExcluded: { includedTags: ['@tag1'], excludedTags: [] },
-      };
+      helper.checkIfContainsTag.mockReturnValue(true);
+      const expected = true;
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });
 
-    test('Case 3: One tag is provided but file does not contain the tag. fileHasTag should be false.', () => {
+    test('Case 3: File does not contain the provided included tag, should return false', () => {
       const file = 'file.feature';
       const tag = '@tag2';
       helper.categorizeTags.mockReturnValue({
         includedTags: ['@tag2'],
         excludedTags: [],
       });
-      const fileHasTagValue = false;
-      helper.checkIfContainsTag.mockReturnValue(fileHasTagValue);
-      const expected = {
-        fileHasTag: fileHasTagValue,
-        unWipedScenarios: true,
-        tagsIncludedExcluded: { includedTags: ['@tag2'], excludedTags: [] },
-      };
+      helper.checkIfContainsTag.mockReturnValue(false);
+      const expected = false;
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });
 
-    test('Case 4: All scenarios wiped for a given tag. unWipedScenarios should be false.', () => {
+    test('Case 4: File contains excluded tag that wipes all scenarios, should return false', () => {
       const file = 'file.feature';
-      const tag = '@tag3';
+      const tag = 'not @excluded';
       helper.categorizeTags.mockReturnValue({
-        includedTags: ['@tag3'],
+        includedTags: [],
         excludedTags: ['@excluded'],
       });
-      helper.checkIfAllWiped.mockReturnValue(false);
-      const fileHasTagValue = true;
-      helper.checkIfContainsTag.mockReturnValue(fileHasTagValue);
-
-      const expected = {
-        fileHasTag: fileHasTagValue,
-        unWipedScenarios: false,
-        tagsIncludedExcluded: {
-          includedTags: ['@tag3'],
-          excludedTags: ['@excluded'],
-        },
-      };
+      helper.checkIfAllWiped.mockReturnValue(true);
+      const expected = false;
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });
 
-    test('Case 5: Multiple tags are provided for inclusion and exclusion.', () => {
+    test('Case 5: File contains included tags and is not wiped by excluded tags, should return true', () => {
       const file = 'file.feature';
-      const tag = '@tag4 and @tag5 and not @exclude';
-
+      const tag = '@tag4 and not @exclude';
       helper.categorizeTags.mockReturnValue({
-        includedTags: ['@tag4', '@tag5'],
+        includedTags: ['@tag4'],
         excludedTags: ['@excluded'],
       });
+      helper.checkIfContainsTag.mockReturnValue(true);
       helper.checkIfAllWiped.mockReturnValue(false);
-      const fileHasTagValue = true;
-      helper.checkIfContainsTag.mockReturnValue(fileHasTagValue);
-
-      const expected = {
-        fileHasTag: true,
-        unWipedScenarios: false,
-        tagsIncludedExcluded: {
-          includedTags: ['@tag4', '@tag5'],
-          excludedTags: ['@excluded'],
-        },
-      };
+      const expected = true;
       const result = determineFilePropertiesBasedOnTags(file, tag);
       expect(result).toEqual(expected);
     });

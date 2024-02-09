@@ -76,6 +76,7 @@ async function getInputData() {
     tag,
     customCommand,
     lambdaThreads,
+    ecsThreads,
     showOnlyResultsForId,
     executionTimeOutSecs,
     help,
@@ -107,6 +108,9 @@ async function getInputData() {
       case '--lambda-threads':
         lambdaThreads = cliArgs[i + 1];
         break;
+      case '--ecs-threads':
+        ecsThreads = cliArgs[i + 1];
+        break;
       case '--help':
       case '-h':
         help = true;
@@ -128,6 +132,7 @@ async function getInputData() {
       lambdaTimeOutSecs || configurationData.lambda?.timeOutInSecs || 120,
     lambdaThreads:
       lambdaThreads || configurationData.lambda?.lambdaThreads || 0,
+    ecsThreads: ecsThreads || configurationData.ecs?.ecsThreads || 0,
     executionTypeInput: executionTypeInput || defaultExecutionType,
     containerName: configurationData.ecs?.containerName,
     clusterARN: configurationData.ecs?.clusterARN,
@@ -399,21 +404,17 @@ function checkIfAllWiped(filename, tag) {
   // Check if every scenario is wipped
   const contents = readFileSync(filename, 'utf-8');
 
+  const scenarioRegex = /(?:@[\w]+[\s]*)*(Scenario:|Scenario Outline:)/g;
+
   const tagRegex = new RegExp(`${tag}`, 'g');
-  const numOfTagged = (contents.match(tagRegex) || []).length;
 
-  if (!numOfTagged) {
-    return true;
-  }
+  const allScenarios = contents.match(scenarioRegex) || [];
 
-  let numOfScenarios = (contents.match(/Scenario:/g) || []).length;
-  numOfScenarios += (contents.match(/Scenario Outline:/g) || []).length;
+  const taggedScenarios = contents.match(tagRegex) || [];
 
-  if (!numOfScenarios) {
-    return true;
-  }
-
-  return numOfTagged < numOfScenarios;
+  return (
+    allScenarios.length > 0 && allScenarios.length === taggedScenarios.length
+  );
 }
 
 async function readConfigurationFIle(file) {

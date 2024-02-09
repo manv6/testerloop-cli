@@ -1,5 +1,6 @@
 const glob = require('glob');
 const { waitUntilTasksStopped } = require('@aws-sdk/client-ecs');
+const { Semaphore } = require('async-mutex');
 
 const {
   handleResult,
@@ -8,182 +9,91 @@ const {
 const {
   getEcsEnvVariables,
 } = require('../utils/envVariables/envVariablesHandler');
-const { getInputData, line } = require('../utils/helper');
+const { getInputData } = require('../utils/helper');
 const { getLogger } = require('../logger/logger');
 const { setExitCode } = require('../utils/exitCode');
 
 const { sendCommandToEcs } = require('./taskProcessor');
 const { getEcsClient } = require('./client');
 
+// Execute on ECS in parallel (with or without throttling)
+// use semaphore to limit the number of concurrent tasks
+// If `ecsThreads` not specified or === 0, all tasks to be executed concurrently
 async function executeEcs(runId, s3RunPath) {
-  const {
-    specFilesPath,
-    tag,
-    containerName,
-    clusterARN,
-    taskDefinition,
-    subnets,
-    securityGroups,
-    uploadToS3RoleArn,
-    s3BucketName,
-    customCommand,
-    ecsPublicIp,
-  } = await getInputData();
-
+  const inputData = await getInputData();
+  const client = await getEcsClient();
   const logger = getLogger();
+  const files = getFeatureFiles(inputData.specFilesPath);
 
-  // Check if we passed one feature file or a whole folder of feature files
-  let suffix = '/**/*.feature';
-  if (specFilesPath.includes('.feature') === true) suffix = '';
-  const files = glob.sync(`${specFilesPath}${suffix}`).map((file) => `${file}`);
-
-  const tasks = [];
-  const taskDetails = [];
-  const fileNames = [];
-  const pendingEcsTasks = [];
-
-  await Promise.all(
-    files.map(async (file) => {
-      const filename = file.split('/').pop();
-      // Determine if the file is suitable for execution based on tags
-
-      const { unWipedScenarios, fileHasTag, tagsIncludedExcluded } =
-        determineFilePropertiesBasedOnTags(file, tag);
-
-      const envVars = await getEcsEnvVariables(runId);
-      // Determine if there is a custom command
-      let finalCommand;
-      if (customCommand) {
-        finalCommand = `timeout 2400 ${customCommand
-          .replace(/%TEST_FILE\b/g, file)
-          .replace(/%TEST_FILENAME\b/g, file.split('/').pop())}`.split(' ');
-      } else {
-        finalCommand =
-          `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(
-            ' ',
-          );
-      }
-      if (unWipedScenarios && (fileHasTag || tag === undefined)) {
-        // Send the events to ecs
-        fileNames.push(filename);
-
-        pendingEcsTasks.push(
-          sendCommandToEcs(
-            containerName,
-            finalCommand,
-            clusterARN,
-            taskDefinition,
-            subnets,
-            securityGroups,
-            uploadToS3RoleArn,
-            envVars,
-            ecsPublicIp,
-          ),
-        );
-      }
-      if (fileHasTag === null && tag !== undefined)
-        logger.info(
-          `${filename}\n* No "${tagsIncludedExcluded.includedTags}" tag in file ${file}`,
-        );
-
-      if (!unWipedScenarios)
-        logger.info(
-          `* All scenarios tagged as "'${tagsIncludedExcluded.excludedTags}'" for ${filename}`,
-        );
-    }),
+  const sem = new Semaphore(
+    inputData.ecsThreads > 0 ? inputData.ecsThreads : files.length,
   );
-  logger.info('Executing ' + pendingEcsTasks.length + ' tasks:');
-  let counter = 0;
-  for (const taskArn of await Promise.all(pendingEcsTasks)) {
-    tasks.push(taskArn);
-    taskDetails.push({ arn: taskArn, fileName: fileNames[counter] });
-    if (typeof taskArn !== 'string') throw Error('Task ARN is not defined.');
-    counter++;
+
+  logger.info(
+    inputData.ecsThreads > 0
+      ? `Throttling executions: only ${inputData.ecsThreads} tasks will run concurrently.`
+      : `No throttling applied: processing all ${files.length} files concurrently.`,
+  );
+
+  const taskPromises = files.map((file) =>
+    sem.runExclusive(() => processTask(file, inputData, client, logger, runId)),
+  );
+
+  await Promise.all(taskPromises);
+
+  logger.info('All tasks have been executed.');
+  await handleResult(inputData.s3BucketName, s3RunPath, runId);
+}
+
+// Process a single test file
+// determine  eligibility based on tags
+// if eligible send to ECS, wait for task to complete and handle result
+async function processTask(file, inputData, client, logger, runId) {
+  const filename = file.split('/').pop();
+  const shouldProcess = determineFilePropertiesBasedOnTags(file, inputData.tag);
+
+  if (!shouldProcess) {
+    return;
   }
 
-  async function handleTasks() {
-    const timeoutTasks = [];
-    if (tasks.length > 0) {
-      const maxWaitTime = 1200;
-      const maxDelay = 10;
-      const minDelay = 5;
+  const envVars = await getEcsEnvVariables(runId);
+  const finalCommand = inputData.customCommand
+    ? `timeout 2400 ${inputData.customCommand
+        .replace(/%TEST_FILE\b/g, file)
+        .replace(/%TEST_FILENAME\b/g, filename)}`.split(' ')
+    : `timeout 2400 npx cypress run --browser chrome --spec ${file}`.split(' ');
 
-      try {
-        // Wait for tasks to   complete
-
-        const waitPromises = taskDetails.map(async (taskDetail) => {
-          return new Promise(async (resolve) => {
-            try {
-              logger.info(
-                `+ Executing task: ${taskDetail.arn} -> ${taskDetail.fileName}`,
-              );
-              const waitECSTask = await waitUntilTasksStopped(
-                {
-                  client: await getEcsClient(),
-                  maxWaitTime: maxWaitTime,
-                  maxDelay: maxDelay,
-                  minDelay: minDelay,
-                },
-                { cluster: clusterARN, tasks: [taskDetail.arn] },
-              );
-              logger.info(
-                `Task completed successfully ${taskDetail.arn} -> ${taskDetail.fileName}`,
-              );
-              resolve(waitECSTask);
-            } catch (error) {
-              if (error.toString().includes('TimeoutError')) {
-                // Handle the timeout exception for the current task
-                timeoutTasks.push({
-                  taskArn: taskDetail.arn,
-                  fileName: taskDetail.fileName,
-                });
-                logger.warning(
-                  `Timeout exception occurred for task: ${taskDetail.arn} -> ${taskDetail.fileName}`,
-                );
-              } else {
-                // Handle other types of exceptions
-                logger.warning(
-                  `An error occurred for task ${taskDetail} -> ${taskDetail.fileName}`,
-                  {
-                    error,
-                  },
-                );
-                logger.debug(
-                  `An error occurred for task ${taskDetail} -> ${
-                    taskDetail.fileName
-                  }, ${JSON.stringify(error)}`,
-                );
-              }
-              setExitCode(1);
-              resolve(error);
-            }
-          });
-        });
-        logger.info('Starting to poll for tasks to complete');
-        await Promise.all(waitPromises);
-        line();
-        logger.info('All tasks completed.');
-        if (timeoutTasks.length > 0) {
-          logger.warning(`Timed-out tasks: ${JSON.stringify(timeoutTasks)}`);
-          logger.error(
-            `There were "${timeoutTasks.length}" timed out tasks after 20 minutes. Results cannot be guaranteed and thus testerloop will fail the build.`,
-          );
-        }
-      } catch (err) {
-        logger.error('Error waiting for the ecs tasks', { err });
-        logger.debug('Error waiting for the ecs tasks', err);
-        setExitCode(1);
-      }
-    }
-  }
-
-  await handleTasks();
-
-  if (tasks.length > 0) {
-    await handleResult(s3BucketName, s3RunPath, runId);
+  try {
+    const taskArn = await sendCommandToEcs(
+      inputData.containerName,
+      finalCommand,
+      inputData.clusterARN,
+      inputData.taskDefinition,
+      inputData.subnets,
+      inputData.securityGroups,
+      inputData.uploadToS3RoleArn,
+      envVars,
+      inputData.ecsPublicIp,
+      client,
+    );
+    logger.info(`+ Executing task: ${taskArn} -> ${filename}`);
+    await waitUntilTasksStopped(
+      { client, maxWaitTime: 1200, maxDelay: 10, minDelay: 5 },
+      { cluster: inputData.clusterARN, tasks: [taskArn] },
+    );
+    logger.info(`Task completed successfully: ${taskArn} -> ${filename}`);
+  } catch (error) {
+    logger.error(`Error processing file -> ${filename}: ${error}`);
+    setExitCode(1);
   }
 }
 
-module.exports = {
-  executeEcs,
-};
+function getFeatureFiles(specFilesPath) {
+  return glob.sync(
+    `${specFilesPath}${
+      specFilesPath.includes('.feature') ? '' : '/**/*.feature'
+    }`,
+  );
+}
+
+module.exports = { executeEcs };
