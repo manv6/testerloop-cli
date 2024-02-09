@@ -173,7 +173,12 @@ async function getLambdaTestResultsFromLocalBasedOnId(
 
 function determineFilePropertiesBasedOnTags(file, tag) {
   const logger = getLogger();
-  if (!tag) return true;
+  if (!tag) {
+    logger.info(
+      `* No tags provided. File "${file}" will be executed by default.`,
+    );
+    return true;
+  }
 
   const { includedTags, excludedTags } = categorizeTags(tag);
 
