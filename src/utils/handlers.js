@@ -198,7 +198,7 @@ function determineFilePropertiesBasedOnTags(file, tag) {
     excludedTags.every((excludedTag) => checkIfAllWiped(file, excludedTag));
 
   if (includedTags.length > 0 && !hasIncludedTag) {
-    logger.info(
+    logger.debug(
       `* File "${file}" does not contain any of the included tags: "${includedTags.join(
         ', ',
       )}"`,
